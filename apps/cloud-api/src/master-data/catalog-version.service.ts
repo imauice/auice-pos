@@ -1,0 +1,2 @@
+import { Injectable } from '@nestjs/common'; import { InjectModel } from '@nestjs/mongoose'; import { Model } from 'mongoose';
+@Injectable() export class CatalogVersionService { constructor(@InjectModel('Branch') private readonly branches:Model<unknown>){} async next(branchId:string):Promise<number>{const branch=await this.branches.findOneAndUpdate({id:branchId},{$inc:{currentCatalogVersion:1}},{new:true}).lean<{currentCatalogVersion:number}>().exec(); if(!branch)throw new Error('Branch not found'); return branch.currentCatalogVersion;} }

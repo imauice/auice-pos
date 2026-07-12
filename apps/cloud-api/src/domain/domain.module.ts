@@ -6,5 +6,5 @@ import { ProductRulesService } from './product-rules.service';
   { name: 'Branch', schema: BranchSchema }, { name: 'Device', schema: DeviceSchema }, { name: 'Category', schema: CategorySchema },
   { name: 'Product', schema: ProductSchema }, { name: 'ProductUnit', schema: ProductUnitSchema }, { name: 'ProductPrice', schema: ProductPriceSchema },
   { name: 'Shift', schema: ShiftSchema }, { name: 'Sale', schema: SaleSchema }, { name: 'StockMovement', schema: StockMovementSchema },
-])], providers: [ProductRulesService], exports: [ProductRulesService] })
+])], providers: [ProductRulesService], exports: [ProductRulesService, MongooseModule] })
 export class DomainModule {}

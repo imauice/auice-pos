@@ -5,6 +5,7 @@ import { HealthModule } from './health/health.module';
 import * as Joi from 'joi';
 import { DomainModule } from './domain/domain.module';
 import { SyncModule } from './sync/sync.module';
+import { MasterDataModule } from './master-data/master-data.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { SyncModule } from './sync/sync.module';
     HealthModule,
     DomainModule,
     SyncModule,
+    MasterDataModule,
   ],
 })
 export class AppModule {}
