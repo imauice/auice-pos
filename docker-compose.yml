@@ -1,0 +1,23 @@
+services:
+  mongodb:
+    image: mongo:8
+    ports: ["27017:27017"]
+    volumes: ["mongodb-data:/data/db"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  valkey:
+    image: valkey/valkey:latest
+    ports: ["6379:6379"]
+    volumes: ["valkey-data:/data"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  mongodb-data:
+  valkey-data:
+
