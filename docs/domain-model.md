@@ -2,6 +2,8 @@
 
 Syncable entities use a public domain UUID, branch UUID, UTC creation/update timestamps, integer version, and nullable soft-delete timestamp. Transactional records also retain their originating device. Money is integer satang in THB. Quantities and rational conversions are integers only.
 
+Scaled conversion is centralized and exact: `baseQuantityMinor = quantityMinor × conversionNumerator × baseQuantityScale ÷ (quantityScale × conversionDenominator)`. Inputs must be positive integers, division must be exact, and TypeScript rejects unsafe intermediate integer overflow.
+
 The model includes Branch, Device, Category, Product, ProductUnit, ProductPrice, Shift, Sale with embedded SaleItem and Payment snapshots, append-only StockMovement, and SyncEvent. Products never store a current stock quantity.
 
 ## Multi-unit examples
@@ -11,4 +13,3 @@ Beer A has Bottle as its 1/1 base unit with its own barcode and 65 THB price. Ca
 Snack A uses Small bag as base. Large bag is 6/1 and Box is 24/1. Receiving 5 boxes records +120 small bags; selling 2 large bags records −12; selling 3 small bags records −3.
 
 Product service validation must verify Product.baseUnitId belongs to the same product, exactly one active base exists, and its conversion is 1/1. ProductPrice must reference a unit of the same product. MongoDB’s partial unique base-unit and branch-barcode indexes provide additional enforcement. Historical sale and movement snapshots never consult mutable current unit data.
-

@@ -1,21 +1,28 @@
 class UnitConversion {
   static int toBaseMinor({
     required int quantityMinor,
-    required int numerator,
-    required int denominator,
+    required int quantityScale,
+    required int conversionNumerator,
+    required int conversionDenominator,
+    required int baseQuantityScale,
   }) {
-    if (quantityMinor <= 0 || numerator <= 0 || denominator <= 0) {
+    if (quantityMinor <= 0 ||
+        quantityScale <= 0 ||
+        conversionNumerator <= 0 ||
+        conversionDenominator <= 0 ||
+        baseQuantityScale <= 0) {
       throw ArgumentError(
         'Quantity and conversion values must be positive integers',
       );
     }
-    final multiplied = quantityMinor * numerator;
-    if (multiplied % denominator != 0) {
+    final dividend = quantityMinor * conversionNumerator * baseQuantityScale;
+    final divisor = quantityScale * conversionDenominator;
+    if (dividend % divisor != 0) {
       throw StateError(
         'Conversion result cannot be represented exactly at the configured scale',
       );
     }
-    return multiplied ~/ denominator;
+    return dividend ~/ divisor;
   }
 
   static int signedForMovement(String type, int absoluteBaseMinor) {

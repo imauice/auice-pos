@@ -19,6 +19,7 @@ CategorySchema.index({ branchId: 1, active: 1 });
 
 export const ProductSchema = new Schema({ ...syncableFields, categoryId: optionalUuid, sku: String, name: { type: String, required: true }, description: String, baseUnitId: optionalUuid, trackStock: { type: Boolean, required: true }, active: { type: Boolean, required: true } }, options);
 ProductSchema.index({ branchId: 1, sku: 1 }, { unique: true, partialFilterExpression: { sku: { $type: 'string' } } });
+ProductSchema.pre('validate', function (this: { trackStock: boolean; baseUnitId?: string | null }) { if (this.trackStock && !this.baseUnitId) throw new Error('Stock-tracked products require baseUnitId'); });
 
 export const ProductUnitSchema = new Schema({ ...syncableFields, productId: { type: String, required: true, match: UUID_PATTERN }, code: { type: String, required: true }, name: { type: String, required: true }, unitCategory: { type: String, enum: UNIT_CATEGORIES, required: true }, isBaseUnit: { type: Boolean, required: true }, conversionNumerator: integer(1), conversionDenominator: integer(1), barcode: String, allowSale: { type: Boolean, required: true }, allowPurchase: { type: Boolean, required: true }, active: { type: Boolean, required: true } }, options);
 ProductUnitSchema.index({ branchId: 1, barcode: 1 }, { unique: true, partialFilterExpression: { barcode: { $type: 'string' } } });

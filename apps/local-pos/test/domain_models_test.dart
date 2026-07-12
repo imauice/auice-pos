@@ -15,8 +15,10 @@ void main() {
     expect(
       UnitConversion.toBaseMinor(
         quantityMinor: 10,
-        numerator: 12,
-        denominator: 1,
+        quantityScale: 1,
+        conversionNumerator: 12,
+        conversionDenominator: 1,
+        baseQuantityScale: 1,
       ),
       120,
     );
@@ -27,8 +29,10 @@ void main() {
         'sale',
         UnitConversion.toBaseMinor(
           quantityMinor: 2,
-          numerator: 12,
-          denominator: 1,
+          quantityScale: 1,
+          conversionNumerator: 12,
+          conversionDenominator: 1,
+          baseQuantityScale: 1,
         ),
       ),
       -24,
@@ -39,8 +43,10 @@ void main() {
     expect(
       UnitConversion.toBaseMinor(
         quantityMinor: 5,
-        numerator: 24,
-        denominator: 1,
+        quantityScale: 1,
+        conversionNumerator: 24,
+        conversionDenominator: 1,
+        baseQuantityScale: 1,
       ),
       120,
     );
@@ -49,8 +55,10 @@ void main() {
         'sale',
         UnitConversion.toBaseMinor(
           quantityMinor: 2,
-          numerator: 6,
-          denominator: 1,
+          quantityScale: 1,
+          conversionNumerator: 6,
+          conversionDenominator: 1,
+          baseQuantityScale: 1,
         ),
       ),
       -12,
@@ -61,26 +69,54 @@ void main() {
     expect(
       () => UnitConversion.toBaseMinor(
         quantityMinor: 1,
-        numerator: 1,
-        denominator: 0,
+        quantityScale: 1,
+        conversionNumerator: 1,
+        conversionDenominator: 0,
+        baseQuantityScale: 1,
       ),
       throwsArgumentError,
     );
     expect(
       () => UnitConversion.toBaseMinor(
         quantityMinor: 1,
-        numerator: -1,
-        denominator: 1,
+        quantityScale: 1,
+        conversionNumerator: -1,
+        conversionDenominator: 1,
+        baseQuantityScale: 1,
       ),
       throwsArgumentError,
     );
     expect(
       () => UnitConversion.toBaseMinor(
         quantityMinor: 1,
-        numerator: 1,
-        denominator: 2,
+        quantityScale: 1,
+        conversionNumerator: 1,
+        conversionDenominator: 2,
+        baseQuantityScale: 1,
       ),
       throwsStateError,
+    );
+  });
+  test('scaled weight and length conversions', () {
+    expect(
+      UnitConversion.toBaseMinor(
+        quantityMinor: 1500,
+        quantityScale: 1000,
+        conversionNumerator: 1000,
+        conversionDenominator: 1,
+        baseQuantityScale: 1,
+      ),
+      1500,
+    );
+    expect(
+      UnitConversion.toBaseMinor(
+        quantityMinor: 1,
+        quantityScale: 1,
+        conversionNumerator: 2500,
+        conversionDenominator: 1000,
+        baseQuantityScale: 1000,
+      ),
+      2500,
     );
   });
   test('Sale snapshots serialize without current ProductUnit coupling', () {

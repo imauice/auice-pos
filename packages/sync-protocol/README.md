@@ -6,7 +6,9 @@ Events use client-generated UUID v7 IDs, entity UUIDs, integer versions, UTC tim
 
 ## Idempotency and retries
 
-Event ID is the idempotency key. A repeated ID does not create another record and returns the original `accepted` entity/server version result. Clients may retry after timeouts with the same event. Events are sent oldest-first, but v1 does not guarantee cross-device ordering. Failures are never discarded: retryable rejections remain queued; repeated terminal failures may later become `dead_letter`. The worker, dead-letter automation, pull protocol, and conflict resolution are future work.
+Event ID is the idempotency key. A repeated ID with identical immutable envelope and payload content does not create another record and returns the original `accepted` result. Reusing an ID with different branch, device, entity metadata, timestamp, or payload returns non-retryable `IDEMPOTENCY_CONFLICT`. Events are sent oldest-first, but v1 does not guarantee cross-device ordering.
+
+The local outbox uses `pending`, `processing`, `synced`, and `dead_letter`. A retryable failure returns to `pending`, increments `retryCount`, and records `lastError` plus `lastAttemptAt`, so it remains discoverable. A future worker will apply a configured retry limit and move exhausted events to `dead_letter`; that worker is not implemented here.
 
 ## Errors
 
@@ -17,6 +19,7 @@ Event ID is the idempotency key. A repeated ID does not create another record an
 - `BRANCH_MISMATCH`: envelope and entity branches differ.
 - `DEVICE_INACTIVE`: originating device is disabled.
 - `DUPLICATE_EVENT`: reserved; v1 duplicates normally return accepted.
+- `IDEMPOTENCY_CONFLICT`: an existing event ID has different immutable content; never retry under that ID.
 - `INTERNAL_ERROR`: transient server persistence failure; retryable.
 
 ## Multi-unit payload examples

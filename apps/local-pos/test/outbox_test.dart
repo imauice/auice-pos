@@ -29,21 +29,25 @@ void main() {
       'later',
     ]);
   });
-  test('mark processing, synced and failed transitions', () async {
-    final now = DateTime.utc(2026);
-    await db.insertOutboxEvent(event('one', now));
-    await db.markOutboxProcessing('one', now);
-    expect((await db.select(db.syncOutbox).getSingle()).status, 'processing');
-    await db.markOutboxFailed('one', 'offline', now);
-    var row = await db.select(db.syncOutbox).getSingle();
-    expect(row.status, 'failed');
-    expect(row.retryCount, 1);
-    expect(row.lastError, 'offline');
-    await db.markOutboxSynced('one', now);
-    row = await db.select(db.syncOutbox).getSingle();
-    expect(row.status, 'synced');
-    expect(row.syncedAt?.toUtc(), now);
-  });
+  test(
+    'retryable failure returns to pending, remains selectable, then syncs',
+    () async {
+      final now = DateTime.utc(2026);
+      await db.insertOutboxEvent(event('one', now));
+      await db.markOutboxProcessing('one', now);
+      expect((await db.select(db.syncOutbox).getSingle()).status, 'processing');
+      await db.markOutboxFailed('one', 'offline', now);
+      var row = await db.select(db.syncOutbox).getSingle();
+      expect(row.status, 'pending');
+      expect(row.retryCount, 1);
+      expect(row.lastError, 'offline');
+      expect((await db.listPendingEvents()).single.id, 'one');
+      await db.markOutboxSynced('one', now);
+      row = await db.select(db.syncOutbox).getSingle();
+      expect(row.status, 'synced');
+      expect(row.syncedAt?.toUtc(), now);
+    },
+  );
   test('v1 migration preserves app_metadata', () async {
     await db.close();
     final raw = sqlite.sqlite3.openInMemory();

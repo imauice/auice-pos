@@ -104,7 +104,7 @@ class AppDatabase extends _$AppDatabase {
     )..where((row) => row.id.equals(id))).getSingle();
     await (update(syncOutbox)..where((row) => row.id.equals(id))).write(
       SyncOutboxCompanion(
-        status: const Value('failed'),
+        status: const Value('pending'),
         retryCount: Value(current.retryCount + 1),
         lastAttemptAt: Value(attemptedAt.toUtc()),
         lastError: Value(error),
