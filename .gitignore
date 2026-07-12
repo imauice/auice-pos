@@ -12,4 +12,4 @@ coverage/
 .idea/
 .vscode/
 apps/local-pos/lib/core/database/app_database.g.dart
-
+*.bundle

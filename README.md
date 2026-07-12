@@ -25,7 +25,7 @@ Install JavaScript dependencies from the root with `npm install`. Install Flutte
 
 Start services from the root with `docker compose up -d`. Run the API with `cd apps/cloud-api && npm run start:dev`, and the website with `cd apps/cloud-web && npm run dev`. Run the POS with `cd apps/local-pos && flutter run`. Override its API location when needed with `flutter run --dart-define=API_BASE_URL=http://HOST:3000/api` (Android emulators commonly use host `10.0.2.2`).
 
-The API health endpoint is `GET http://localhost:3000/api/health`; Swagger is at `http://localhost:3000/docs`. The website reads `VITE_API_BASE_URL`, while the API reads the values documented in its `.env.example`.
+The API health endpoint is `GET http://localhost:3000/api/health`; Swagger is at `http://localhost:3000/api/docs`. Sync protocol v1 accepts validated, idempotent event batches at `POST http://localhost:3000/api/sync/push`. Nest's default 100 KB JSON body limit and a 100-event batch limit protect the endpoint. The website reads `VITE_API_BASE_URL`, while the API reads the values documented in its `.env.example`.
 
 ## Development workflow
 
@@ -33,5 +33,4 @@ Keep work task-focused, add migrations for database changes, validate inputs, us
 
 ## Known limitations
 
-POS-001 contains no authentication, products, sales, payments, stock, shifts, sync outbox, sync worker, or production deployment configuration. Valkey is provisioned but not used. The health endpoint reports unavailable MongoDB meaningfully while retaining HTTP availability.
-
+POS-002 defines product, sale, payment, shift, stock-movement, multi-unit packaging, and sync persistence contracts but no workflows or UI. The local outbox is not connected to business transactions and has no worker. Sync push records events but does not apply payloads to domain collections. Authentication, pull sync, conflict resolution, stock aggregation, purchasing workflows, and production deployment remain absent.

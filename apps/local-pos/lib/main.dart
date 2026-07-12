@@ -7,6 +7,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final database = AppDatabase();
   await database.initialize();
-  runApp(ProviderScope(overrides: [databaseProvider.overrideWithValue(database)], child: const AuicePosApp()));
+  runApp(
+    ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(database)],
+      child: const AuicePosApp(),
+    ),
+  );
 }
-

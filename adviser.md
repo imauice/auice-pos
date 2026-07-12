@@ -24,6 +24,8 @@
 - Validate all API input.
 - Use UTC timestamps internally.
 - Monetary values must not use floating-point arithmetic in future POS modules.
+- Product package conversions must use positive integer rationals and convert directly to the product base unit.
+- Historical sales and stock movements must snapshot unit names, barcodes, conversion data, and prices.
 
 ## Delivery
 
@@ -38,4 +40,3 @@ After completing a task, report:
 7. Known limitations
 8. Risks
 9. Manual verification steps
-

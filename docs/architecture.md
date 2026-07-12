@@ -18,5 +18,24 @@ SQLite Transaction
           MongoDB
 ```
 
-The sync outbox, worker, business records, and synchronization contracts will be implemented in later tasks. Future synchronization must use client-generated UUIDs and idempotent operations. Sales, payments, and stock movements will be append-only; inventory will be derived from movements instead of synchronized by overwriting quantities.
+POS-002 defines synchronization contracts and implements the standalone outbox/event-log persistence foundations. Business tables, transaction-to-outbox integration, and the worker remain for later tasks. Synchronization uses client-generated UUIDs and idempotent operations. Sales, payments, and stock movements are append-only; inventory will be derived from movements instead of synchronized by overwriting quantities.
 
+POS-002 implements the outbox and cloud event-log foundations plus protocol contracts, but not transaction integration or a worker:
+
+```text
+Business Transaction
+   ↓
+SQLite Transaction
+   ├── Domain Record
+   └── Sync Outbox Event
+             ↓
+      Future Sync Worker
+             ↓
+       POST /api/sync/push
+             ↓
+      Cloud Sync Event Log
+             ↓
+ Future Domain Event Application
+```
+
+Products have exactly one inventory base unit. Configurable ProductUnits convert directly to it using positive integer rationals. Unit prices are independent, and sale/movement history snapshots unit and conversion data.
