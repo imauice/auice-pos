@@ -51,6 +51,20 @@ Future<void> seedUi(AppDatabase db) async {
           updatedAt: now,
         ),
       );
+  for (final entry in {
+    'registered_branch_id': 'branch',
+    'device_active': 'true',
+  }.entries) {
+    await db
+        .into(db.appMetadata)
+        .insert(
+          AppMetadataCompanion.insert(
+            key: entry.key,
+            value: entry.value,
+            updatedAt: now,
+          ),
+        );
+  }
   await db
       .into(db.products)
       .insert(

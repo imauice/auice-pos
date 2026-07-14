@@ -85,3 +85,11 @@ Status: Submitted for Review
 - [x] Add Riverpod shift flow, dashboard, cash, closing, history, and detail screens
 - [x] Add shift lifecycle, reconciliation, rollback, concurrency, migration, and UI tests
 - [x] Complete and record final verification
+
+## POS-005-FIX
+
+- [x] Select the configured registered branch and expose setup failures
+- [x] Aggregate pending sync across shift, sale, cash, and sale-stock events
+- [x] Require positive integer Cloud cash-movement amounts
+- [x] Persist immutable count and gross-sale closing snapshots with v7 migration
+- [x] Preserve atomic shift operations and existing sale behavior

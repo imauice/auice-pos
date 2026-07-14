@@ -50,9 +50,43 @@ class ShiftSummary {
 }
 
 class ShiftConfiguration {
-  const ShiftConfiguration(this.branch, this.deviceId);
-  final Branche branch;
-  final String deviceId;
+  const ShiftConfiguration._({
+    required this.status,
+    this.branch,
+    this.deviceId,
+  });
+
+  factory ShiftConfiguration.ready(Branche branch, String deviceId) =>
+      ShiftConfiguration._(
+        status: ShiftConfigurationStatus.ready,
+        branch: branch,
+        deviceId: deviceId,
+      );
+
+  const ShiftConfiguration.failure(ShiftConfigurationStatus status)
+    : this._(status: status);
+
+  final ShiftConfigurationStatus status;
+  final Branche? branch;
+  final String? deviceId;
+  bool get isReady => status == ShiftConfigurationStatus.ready;
+  String get message => switch (status) {
+    ShiftConfigurationStatus.ready => 'Ready',
+    ShiftConfigurationStatus.missingDeviceId => 'Device ID is not configured',
+    ShiftConfigurationStatus.missingRegisteredBranchId =>
+      'Registered branch is not configured',
+    ShiftConfigurationStatus.inactiveDevice => 'Device is inactive',
+    ShiftConfigurationStatus.invalidRegisteredBranch =>
+      'Registered branch is missing, inactive, or deleted',
+  };
+}
+
+enum ShiftConfigurationStatus {
+  ready,
+  missingDeviceId,
+  missingRegisteredBranchId,
+  inactiveDevice,
+  invalidRegisteredBranch,
 }
 
 class ShiftRepository {
@@ -92,15 +126,59 @@ class ShiftRepository {
           .get();
   Future<ShiftSummary> getShiftSummary(String shiftId) =>
       ShiftSummaryService(db, this).get(shiftId);
-  Future<bool> isSyncPending(String shiftId) async =>
-      await (db.select(db.syncOutbox)..where(
-            (r) =>
-                r.entityType.equals('shift') &
-                r.entityId.equals(shiftId) &
-                r.status.equals('pending'),
-          ))
-          .getSingleOrNull() !=
-      null;
+  Future<bool> isSyncPending(String shiftId) async {
+    final saleIds =
+        await (db.selectOnly(db.sales)
+              ..addColumns([db.sales.id])
+              ..where(db.sales.shiftId.equals(shiftId)))
+            .map((row) => row.read(db.sales.id)!)
+            .get();
+    final cashMovementIds =
+        await (db.selectOnly(db.cashMovements)
+              ..addColumns([db.cashMovements.id])
+              ..where(db.cashMovements.shiftId.equals(shiftId)))
+            .map((row) => row.read(db.cashMovements.id)!)
+            .get();
+    final stockMovementIds = saleIds.isEmpty
+        ? <String>[]
+        : await (db.selectOnly(db.stockMovements)
+                ..addColumns([db.stockMovements.id])
+                ..where(
+                  db.stockMovements.referenceType.equals('sale') &
+                      db.stockMovements.referenceId.isIn(saleIds),
+                ))
+              .map((row) => row.read(db.stockMovements.id)!)
+              .get();
+
+    var related =
+        db.syncOutbox.entityType.equals('shift') &
+        db.syncOutbox.entityId.equals(shiftId);
+    if (saleIds.isNotEmpty) {
+      related =
+          related |
+          (db.syncOutbox.entityType.equals('sale') &
+              db.syncOutbox.entityId.isIn(saleIds));
+    }
+    if (cashMovementIds.isNotEmpty) {
+      related =
+          related |
+          (db.syncOutbox.entityType.equals('cash_movement') &
+              db.syncOutbox.entityId.isIn(cashMovementIds));
+    }
+    if (stockMovementIds.isNotEmpty) {
+      related =
+          related |
+          (db.syncOutbox.entityType.equals('stock_movement') &
+              db.syncOutbox.entityId.isIn(stockMovementIds));
+    }
+    return await (db.select(db.syncOutbox)
+              ..where(
+                (row) => row.status.isIn(['pending', 'processing']) & related,
+              )
+              ..limit(1))
+            .getSingleOrNull() !=
+        null;
+  }
 }
 
 class ShiftSummaryService {
@@ -110,6 +188,23 @@ class ShiftSummaryService {
   Future<ShiftSummary> get(String shiftId) async {
     final shift = await repository.getShiftById(shiftId);
     if (shift == null) throw const ShiftException('Shift not found');
+    if (shift.status == 'closed') {
+      return ShiftSummary(
+        shift: shift,
+        salesCount: shift.salesCount,
+        cashSalesCount: shift.cashSalesCount,
+        cashSalesMinor: shift.cashSalesMinor,
+        grossSalesMinor: shift.grossSalesMinor,
+        cashInMinor: shift.cashInMinor,
+        cashOutMinor: shift.cashOutMinor,
+        expectedCashMinor:
+            shift.expectedCashMinor ??
+            (shift.openingCashMinor +
+                shift.cashSalesMinor +
+                shift.cashInMinor -
+                shift.cashOutMinor),
+      );
+    }
     final sales = await repository.getShiftSales(shiftId);
     final cashPayments = sales.isEmpty
         ? <Payment>[]
@@ -133,10 +228,9 @@ class ShiftSummaryService {
     final calculatedOut = movements
         .where((m) => m.type == 'cash_out')
         .fold(0, (sum, m) => sum + m.amountMinor);
-    final closed = shift.status == 'closed';
-    final cashSales = closed ? shift.cashSalesMinor : cashSalesMinor;
-    final cashIn = closed ? shift.cashInMinor : calculatedIn;
-    final cashOut = closed ? shift.cashOutMinor : calculatedOut;
+    final cashSales = cashSalesMinor;
+    final cashIn = calculatedIn;
+    final cashOut = calculatedOut;
     return ShiftSummary(
       shift: shift,
       salesCount: sales.length,
@@ -145,10 +239,7 @@ class ShiftSummaryService {
       grossSalesMinor: sales.fold(0, (sum, sale) => sum + sale.totalMinor),
       cashInMinor: cashIn,
       cashOutMinor: cashOut,
-      expectedCashMinor: closed
-          ? shift.expectedCashMinor ??
-                (shift.openingCashMinor + cashSales + cashIn - cashOut)
-          : shift.openingCashMinor + cashSales + cashIn - cashOut,
+      expectedCashMinor: shift.openingCashMinor + cashSales + cashIn - cashOut,
     );
   }
 }
@@ -181,10 +272,11 @@ class OpenShiftService {
         final configured = await _metadata(db, 'device_id');
         final active = await _metadata(db, 'device_active');
         final registeredBranch = await _metadata(db, 'registered_branch_id');
-        if (configured != deviceId || active == 'false') {
+        if (configured == null || configured != deviceId || active != 'true') {
           throw const ShiftException('Inactive device');
         }
-        if ((registeredBranch != null && registeredBranch != branchId) ||
+        if (registeredBranch == null ||
+            registeredBranch != branchId ||
             branch.currency != currency) {
           throw const ShiftException('Device branch mismatch');
         }
@@ -351,6 +443,9 @@ class CloseShiftService {
                     cashSalesMinor: Value(summary.cashSalesMinor),
                     cashInMinor: Value(summary.cashInMinor),
                     cashOutMinor: Value(summary.cashOutMinor),
+                    salesCount: Value(summary.salesCount),
+                    cashSalesCount: Value(summary.cashSalesCount),
+                    grossSalesMinor: Value(summary.grossSalesMinor),
                     expectedCashMinor: Value(summary.expectedCashMinor),
                     closingCashMinor: Value(closingCashMinor),
                     cashDifferenceMinor: Value(
@@ -460,6 +555,9 @@ Map<String, dynamic> _shiftJson(Shift s) => {
   'cashSalesMinor': s.cashSalesMinor,
   'cashInMinor': s.cashInMinor,
   'cashOutMinor': s.cashOutMinor,
+  'salesCount': s.salesCount,
+  'cashSalesCount': s.cashSalesCount,
+  'grossSalesMinor': s.grossSalesMinor,
   'expectedCashMinor': s.expectedCashMinor,
   'closingCashMinor': s.closingCashMinor,
   'cashDifferenceMinor': s.cashDifferenceMinor,
@@ -515,19 +613,47 @@ final openShiftProvider = FutureProvider<Shift?>((ref) async {
 final shiftSummaryProvider = FutureProvider.family<ShiftSummary, String>(
   (ref, id) => ref.watch(shiftSummaryServiceProvider).get(id),
 );
+final shiftSyncPendingProvider = FutureProvider.family<bool, String>(
+  (ref, id) => ref.watch(shiftRepositoryProvider).isSyncPending(id),
+);
 final recentShiftsProvider = FutureProvider<List<Shift>>(
   (ref) => ref.watch(shiftRepositoryProvider).listRecentShifts(),
 );
-final shiftConfigurationProvider = FutureProvider<ShiftConfiguration?>((
-  ref,
-) async {
-  final db = ref.watch(databaseProvider);
-  final branch =
-      await (db.select(db.branches)
-            ..where((b) => b.active.equals(true) & b.deletedAt.isNull()))
-          .getSingleOrNull();
+Future<ShiftConfiguration> loadShiftConfiguration(AppDatabase db) async {
   final device = await _metadata(db, 'device_id');
-  return branch == null || device == null
-      ? null
-      : ShiftConfiguration(branch, device);
+  if (device == null || device.isEmpty) {
+    return const ShiftConfiguration.failure(
+      ShiftConfigurationStatus.missingDeviceId,
+    );
+  }
+  final branchId = await _metadata(db, 'registered_branch_id');
+  if (branchId == null || branchId.isEmpty) {
+    return const ShiftConfiguration.failure(
+      ShiftConfigurationStatus.missingRegisteredBranchId,
+    );
+  }
+  if (await _metadata(db, 'device_active') != 'true') {
+    return const ShiftConfiguration.failure(
+      ShiftConfigurationStatus.inactiveDevice,
+    );
+  }
+  final branch =
+      await (db.select(db.branches)..where(
+            (row) =>
+                row.id.equals(branchId) &
+                row.active.equals(true) &
+                row.deletedAt.isNull(),
+          ))
+          .getSingleOrNull();
+  if (branch == null) {
+    return const ShiftConfiguration.failure(
+      ShiftConfigurationStatus.invalidRegisteredBranch,
+    );
+  }
+  return ShiftConfiguration.ready(branch, device);
+}
+
+final shiftConfigurationProvider = FutureProvider<ShiftConfiguration>((ref) {
+  final db = ref.watch(databaseProvider);
+  return loadShiftConfiguration(db);
 });

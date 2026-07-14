@@ -3,6 +3,7 @@ import 'package:auice_pos/features/sale/shift_service.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:convert';
 
 final at = DateTime.utc(2026, 7, 15, 8);
 Future<void> configureShift(AppDatabase db, {String device = 'device'}) async {
@@ -101,6 +102,30 @@ Future<void> addCashSale(
       );
 }
 
+Future<void> addOutbox(
+  AppDatabase db, {
+  required String id,
+  required String entityType,
+  required String entityId,
+  String status = 'pending',
+}) => db
+    .into(db.syncOutbox)
+    .insert(
+      SyncOutboxCompanion.insert(
+        id: id,
+        branchId: 'branch',
+        deviceId: 'device',
+        entityType: entityType,
+        entityId: entityId,
+        operation: 'append',
+        entityVersion: 1,
+        payloadJson: '{}',
+        occurredAt: at,
+        createdAt: at,
+        status: Value(status),
+      ),
+    );
+
 void main() {
   late AppDatabase db;
   setUp(() async {
@@ -108,6 +133,65 @@ void main() {
     await configureShift(db);
   });
   tearDown(() => db.close());
+
+  test('configuration selects only the registered active branch', () async {
+    await db
+        .into(db.branches)
+        .insert(
+          BranchesCompanion.insert(
+            id: 'branch-2',
+            code: 'CNX',
+            name: 'Chiang Mai',
+            timezone: 'Asia/Bangkok',
+            currency: 'THB',
+            active: true,
+            version: 1,
+            catalogVersion: 1,
+            updatedAt: at,
+          ),
+        );
+    await (db.update(db.appMetadata)
+          ..where((row) => row.key.equals('registered_branch_id')))
+        .write(const AppMetadataCompanion(value: Value('branch-2')));
+
+    final configuration = await loadShiftConfiguration(db);
+    expect(configuration.status, ShiftConfigurationStatus.ready);
+    expect(configuration.branch?.id, 'branch-2');
+    expect(configuration.deviceId, 'device');
+  });
+
+  test('configuration reports each missing or inactive setup state', () async {
+    await (db.delete(
+      db.appMetadata,
+    )..where((row) => row.key.equals('device_id'))).go();
+    expect(
+      (await loadShiftConfiguration(db)).status,
+      ShiftConfigurationStatus.missingDeviceId,
+    );
+    await configureShift(db);
+    await (db.delete(
+      db.appMetadata,
+    )..where((row) => row.key.equals('registered_branch_id'))).go();
+    expect(
+      (await loadShiftConfiguration(db)).status,
+      ShiftConfigurationStatus.missingRegisteredBranchId,
+    );
+    await configureShift(db);
+    await (db.update(db.appMetadata)
+          ..where((row) => row.key.equals('device_active')))
+        .write(const AppMetadataCompanion(value: Value('false')));
+    expect(
+      (await loadShiftConfiguration(db)).status,
+      ShiftConfigurationStatus.inactiveDevice,
+    );
+    await configureShift(db);
+    await (db.update(db.branches)..where((row) => row.id.equals('branch')))
+        .write(const BranchesCompanion(active: Value(false)));
+    expect(
+      (await loadShiftConfiguration(db)).status,
+      ShiftConfigurationStatus.invalidRegisteredBranch,
+    );
+  });
 
   test(
     'opens zero and positive cash shifts and rejects invalid or duplicate opens',
@@ -242,6 +326,15 @@ void main() {
       expect(summary.cashSalesMinor, 163500);
       expect(summary.grossSalesMinor, 163500);
       expect(summary.expectedCashMinor, 293500);
+
+      await (db.update(db.sales)..where((sale) => sale.id.equals('sale2')))
+          .write(const SalesCompanion(status: Value('voided')));
+      final changedOpenSummary = await ShiftSummaryService(
+        db,
+        ShiftRepository(db),
+      ).get(shift.id);
+      expect(changedOpenSummary.salesCount, 1);
+      expect(changedOpenSummary.grossSalesMinor, 19500);
     },
   );
 
@@ -366,6 +459,25 @@ void main() {
       expect(result.shift.cashSalesMinor, 19500);
       expect(result.shift.expectedCashMinor, 119500);
       expect(result.shift.cashDifferenceMinor, -500);
+      expect(result.shift.salesCount, 1);
+      expect(result.shift.cashSalesCount, 1);
+      expect(result.shift.grossSalesMinor, 19500);
+      final closeEvent = (await db.select(db.syncOutbox).get()).last;
+      final closePayload = jsonDecode(closeEvent.payloadJson) as Map;
+      expect(closePayload['salesCount'], 1);
+      expect(closePayload['cashSalesCount'], 1);
+      expect(closePayload['grossSalesMinor'], 19500);
+
+      await (db.update(db.sales)..where((sale) => sale.id.equals('sale')))
+          .write(const SalesCompanion(status: Value('voided')));
+      final immutable = await ShiftSummaryService(
+        db,
+        ShiftRepository(db),
+      ).get(shift.id);
+      expect(immutable.salesCount, 1);
+      expect(immutable.cashSalesCount, 1);
+      expect(immutable.grossSalesMinor, 19500);
+      expect(immutable.cashSalesMinor, 19500);
       expect(
         (await db.select(db.syncOutbox).get()).any((e) => e.id == 'sale-event'),
         isTrue,
@@ -390,6 +502,100 @@ void main() {
     final stored = await ShiftRepository(db).getShiftById(shift.id);
     expect(stored?.status, 'open');
     expect(stored?.closingCashMinor, null);
+    expect(stored?.salesCount, 0);
+    expect(stored?.cashSalesCount, 0);
+    expect(stored?.grossSalesMinor, 0);
+  });
+
+  test('pending sync aggregates only related shift entities', () async {
+    final shift = await OpenShiftService(
+      db,
+    ).open(branchId: 'branch', deviceId: 'device', openingCashMinor: 0);
+    await addCashSale(
+      db,
+      shift,
+      id: 'sale-sync',
+      total: 100,
+      paid: 100,
+      change: 0,
+    );
+    await (db.update(
+      db.syncOutbox,
+    )).write(const SyncOutboxCompanion(status: Value('synced')));
+    final repository = ShiftRepository(db);
+
+    await addOutbox(
+      db,
+      id: 'other-shift-event',
+      entityType: 'shift',
+      entityId: 'other-shift',
+    );
+    expect(await repository.isSyncPending(shift.id), isFalse);
+
+    await addOutbox(
+      db,
+      id: 'sale-sync-event',
+      entityType: 'sale',
+      entityId: 'sale-sync',
+    );
+    expect(await repository.isSyncPending(shift.id), isTrue);
+    await (db.update(db.syncOutbox)
+          ..where((event) => event.id.equals('sale-sync-event')))
+        .write(const SyncOutboxCompanion(status: Value('processing')));
+    expect(await repository.isSyncPending(shift.id), isTrue);
+    await (db.update(db.syncOutbox)
+          ..where((event) => event.id.equals('sale-sync-event')))
+        .write(const SyncOutboxCompanion(status: Value('synced')));
+
+    final movement = await CashMovementService(db).record(
+      shiftId: shift.id,
+      branchId: 'branch',
+      deviceId: 'device',
+      type: 'cash_in',
+      amountMinor: 1,
+      reasonCode: 'other',
+    );
+    expect(await repository.isSyncPending(shift.id), isTrue);
+    await (db.update(db.syncOutbox)..where(
+          (event) =>
+              event.entityType.equals('cash_movement') &
+              event.entityId.equals(movement.id),
+        ))
+        .write(const SyncOutboxCompanion(status: Value('synced')));
+    expect(await repository.isSyncPending(shift.id), isFalse);
+
+    await db
+        .into(db.stockMovements)
+        .insert(
+          StockMovementsCompanion.insert(
+            id: 'stock-sync',
+            branchId: 'branch',
+            deviceId: 'device',
+            productId: 'product',
+            type: 'sale',
+            sourceUnitId: 'unit',
+            sourceUnitCodeSnapshot: 'each',
+            sourceUnitNameSnapshot: 'Each',
+            sourceQuantityMinor: 1,
+            sourceQuantityScale: 1,
+            conversionNumeratorSnapshot: 1,
+            conversionDenominatorSnapshot: 1,
+            baseQuantityMinor: -1,
+            baseQuantityScale: 1,
+            referenceType: 'sale',
+            referenceId: 'sale-sync',
+            occurredAt: at,
+            createdAt: at,
+            version: 1,
+          ),
+        );
+    await addOutbox(
+      db,
+      id: 'stock-sync-event',
+      entityType: 'stock_movement',
+      entityId: 'stock-sync',
+    );
+    expect(await repository.isSyncPending(shift.id), isTrue);
   });
 
   test('concurrent open and close requests have one winner', () async {

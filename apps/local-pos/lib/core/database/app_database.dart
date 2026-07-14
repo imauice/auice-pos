@@ -134,6 +134,9 @@ class Shifts extends Table {
   IntColumn get cashSalesMinor => integer().withDefault(const Constant(0))();
   IntColumn get cashInMinor => integer().withDefault(const Constant(0))();
   IntColumn get cashOutMinor => integer().withDefault(const Constant(0))();
+  IntColumn get salesCount => integer().withDefault(const Constant(0))();
+  IntColumn get cashSalesCount => integer().withDefault(const Constant(0))();
+  IntColumn get grossSalesMinor => integer().withDefault(const Constant(0))();
   IntColumn get closingCashMinor => integer().nullable()();
   IntColumn get expectedCashMinor => integer().nullable()();
   IntColumn get cashDifferenceMinor => integer().nullable()();
@@ -285,7 +288,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -329,6 +332,11 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(shifts, shifts.cashInMinor);
         await m.addColumn(shifts, shifts.cashOutMinor);
         await m.addColumn(shifts, shifts.deletedAt);
+      }
+      if (from >= 4 && from < 7) {
+        await m.addColumn(shifts, shifts.salesCount);
+        await m.addColumn(shifts, shifts.cashSalesCount);
+        await m.addColumn(shifts, shifts.grossSalesMinor);
       }
       if (from < 6) {
         await m.createTable(cashMovements);

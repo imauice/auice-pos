@@ -504,6 +504,9 @@ class Shift {
     this.cashSalesMinor = 0,
     this.cashInMinor = 0,
     this.cashOutMinor = 0,
+    this.salesCount = 0,
+    this.cashSalesCount = 0,
+    this.grossSalesMinor = 0,
     this.closingCashMinor,
     this.expectedCashMinor,
     this.cashDifferenceMinor,
@@ -520,6 +523,9 @@ class Shift {
       cashSalesMinor,
       cashInMinor,
       cashOutMinor,
+      salesCount,
+      cashSalesCount,
+      grossSalesMinor,
       version;
   final int? closingCashMinor, expectedCashMinor, cashDifferenceMinor;
 }

@@ -5,6 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+String _syncStatus(AsyncValue<bool> value) => value.when(
+  data: (pending) => pending ? 'Pending' : 'Synced',
+  loading: () => 'Checking',
+  error: (_, _) => 'Unknown',
+);
+
 class ShiftGateScreen extends ConsumerWidget {
   const ShiftGateScreen({super.key});
   @override
@@ -39,8 +45,8 @@ class _ShiftStartState extends ConsumerState<ShiftStartScreen> {
 
   Future<void> open() async {
     final config = await ref.read(shiftConfigurationProvider.future);
-    if (config == null) {
-      setState(() => error = 'Branch or device is not configured');
+    if (!config.isReady) {
+      setState(() => error = config.message);
       return;
     }
     try {
@@ -51,10 +57,10 @@ class _ShiftStartState extends ConsumerState<ShiftStartScreen> {
       await ref
           .read(openShiftServiceProvider)
           .open(
-            branchId: config.branch.id,
-            deviceId: config.deviceId,
+            branchId: config.branch!.id,
+            deviceId: config.deviceId!,
             openingCashMinor: MoneyParser.parseMinor(amount.text),
-            currency: config.branch.currency,
+            currency: config.branch!.currency,
           );
       ref.invalidate(openShiftProvider);
       ref.invalidate(recentShiftsProvider);
@@ -83,8 +89,10 @@ class _ShiftStartState extends ConsumerState<ShiftStartScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Branch: ${config.valueOrNull?.branch.name ?? 'Loading'}'),
-            Text('Device: ${config.valueOrNull?.deviceId ?? 'Loading'}'),
+            Text(
+              'Branch: ${config.valueOrNull?.branch?.name ?? config.valueOrNull?.message ?? 'Loading'}',
+            ),
+            Text('Device: ${config.valueOrNull?.deviceId ?? 'Not configured'}'),
             TextField(
               controller: amount,
               decoration: const InputDecoration(labelText: 'Opening cash'),
@@ -112,53 +120,57 @@ class ShiftDashboardScreen extends ConsumerWidget {
   const ShiftDashboardScreen({required this.shiftId, super.key});
   final String shiftId;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Open Shift Dashboard'),
-      actions: [
-        IconButton(
-          onPressed: () => context.push('/shifts'),
-          icon: const Icon(Icons.history),
-        ),
-      ],
-    ),
-    body: ref
-        .watch(shiftSummaryProvider(shiftId))
-        .when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, _) =>
-              const Center(child: Text('Unable to load shift summary')),
-          data: (s) => ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text('Opened: ${s.shift.openedAt.toLocal()}'),
-              Text('Opening cash: ${money(s.shift.openingCashMinor)} THB'),
-              Text('Sales: ${s.salesCount}'),
-              Text('Gross sales: ${money(s.grossSalesMinor)} THB'),
-              Text('Cash in: ${money(s.cashInMinor)} THB'),
-              Text('Cash out: ${money(s.cashOutMinor)} THB'),
-              Text('Expected cash: ${money(s.expectedCashMinor)} THB'),
-              const Text('Sync: Pending'),
-              FilledButton(
-                onPressed: () => context.push('/sale'),
-                child: const Text('Start Sale'),
-              ),
-              FilledButton.tonal(
-                onPressed: () => context.push('/shift/$shiftId/cash/cash_in'),
-                child: const Text('Cash In'),
-              ),
-              FilledButton.tonal(
-                onPressed: () => context.push('/shift/$shiftId/cash/cash_out'),
-                child: const Text('Cash Out'),
-              ),
-              OutlinedButton(
-                onPressed: () => context.push('/shift/$shiftId/close'),
-                child: const Text('Close Shift'),
-              ),
-            ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncPending = ref.watch(shiftSyncPendingProvider(shiftId));
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Open Shift Dashboard'),
+        actions: [
+          IconButton(
+            onPressed: () => context.push('/shifts'),
+            icon: const Icon(Icons.history),
           ),
-        ),
-  );
+        ],
+      ),
+      body: ref
+          .watch(shiftSummaryProvider(shiftId))
+          .when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, _) =>
+                const Center(child: Text('Unable to load shift summary')),
+            data: (s) => ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                Text('Opened: ${s.shift.openedAt.toLocal()}'),
+                Text('Opening cash: ${money(s.shift.openingCashMinor)} THB'),
+                Text('Sales: ${s.salesCount}'),
+                Text('Gross sales: ${money(s.grossSalesMinor)} THB'),
+                Text('Cash in: ${money(s.cashInMinor)} THB'),
+                Text('Cash out: ${money(s.cashOutMinor)} THB'),
+                Text('Expected cash: ${money(s.expectedCashMinor)} THB'),
+                Text('Sync: ${_syncStatus(syncPending)}'),
+                FilledButton(
+                  onPressed: () => context.push('/sale'),
+                  child: const Text('Start Sale'),
+                ),
+                FilledButton.tonal(
+                  onPressed: () => context.push('/shift/$shiftId/cash/cash_in'),
+                  child: const Text('Cash In'),
+                ),
+                FilledButton.tonal(
+                  onPressed: () =>
+                      context.push('/shift/$shiftId/cash/cash_out'),
+                  child: const Text('Cash Out'),
+                ),
+                OutlinedButton(
+                  onPressed: () => context.push('/shift/$shiftId/close'),
+                  child: const Text('Close Shift'),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
 }
 
 class CashMovementScreen extends ConsumerStatefulWidget {
@@ -208,6 +220,7 @@ class _CashMovementState extends ConsumerState<CashMovementScreen> {
             note: note.text.trim().isEmpty ? null : note.text.trim(),
           );
       ref.invalidate(shiftSummaryProvider(widget.shiftId));
+      ref.invalidate(shiftSyncPendingProvider(widget.shiftId));
       if (mounted) context.pop();
     } on Object catch (e) {
       if (mounted) setState(() => error = e.toString());
@@ -288,6 +301,7 @@ class _CloseShiftState extends ConsumerState<CloseShiftScreen> {
           .read(closeShiftServiceProvider)
           .close(widget.shiftId, MoneyParser.parseMinor(closing.text));
       ref.invalidate(shiftSummaryProvider(widget.shiftId));
+      ref.invalidate(shiftSyncPendingProvider(widget.shiftId));
       ref.invalidate(openShiftProvider);
       ref.invalidate(recentShiftsProvider);
       if (mounted) context.go('/shift/${widget.shiftId}');
@@ -362,6 +376,9 @@ class ShiftHistoryScreen extends ConsumerWidget {
                   future: ref.read(shiftSummaryServiceProvider).get(s.id),
                   builder: (context, snapshot) {
                     final summary = snapshot.data;
+                    final syncPending = ref.watch(
+                      shiftSyncPendingProvider(s.id),
+                    );
                     return ListTile(
                       title: Text('${s.openedAt.toLocal()} — ${s.status}'),
                       subtitle: Text(
@@ -369,7 +386,8 @@ class ShiftHistoryScreen extends ConsumerWidget {
                         'Gross ${money(summary?.grossSalesMinor ?? 0)} • '
                         'Expected ${money(s.expectedCashMinor ?? summary?.expectedCashMinor ?? 0)} • '
                         'Closing ${money(s.closingCashMinor ?? 0)} • '
-                        'Difference ${money(s.cashDifferenceMinor ?? 0)} • Sync pending',
+                        'Difference ${money(s.cashDifferenceMinor ?? 0)} • '
+                        'Sync ${_syncStatus(syncPending).toLowerCase()}',
                       ),
                       isThreeLine: true,
                       onTap: () => context.push('/shift/${s.id}'),
@@ -386,57 +404,64 @@ class ShiftDetailScreen extends ConsumerWidget {
   const ShiftDetailScreen({required this.shiftId, super.key});
   final String shiftId;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Shift Detail')),
-    body: ref
-        .watch(shiftSummaryProvider(shiftId))
-        .when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, _) =>
-              const Center(child: Text('Unable to load shift detail')),
-          data: (s) => FutureBuilder(
-            future: Future.wait([
-              ref.read(shiftRepositoryProvider).getShiftCashMovements(shiftId),
-              ref.read(shiftRepositoryProvider).getShiftSales(shiftId),
-            ]),
-            builder: (context, snapshot) {
-              final movements = snapshot.data?[0] ?? [];
-              final sales = snapshot.data?[1] ?? [];
-              return ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  Text('Status: ${s.shift.status}'),
-                  Text('Gross sales: ${money(s.grossSalesMinor)} THB'),
-                  Text('Expected cash: ${money(s.expectedCashMinor)} THB'),
-                  Text('Closing cash: ${money(s.closingCashMinor ?? 0)} THB'),
-                  Text('Difference: ${money(s.cashDifferenceMinor ?? 0)} THB'),
-                  const Text('Sync: Pending'),
-                  if (s.shift.status == 'closed') ...[
-                    FilledButton(
-                      onPressed: () => context.go('/shift'),
-                      child: const Text('Start New Shift'),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncPending = ref.watch(shiftSyncPendingProvider(shiftId));
+    return Scaffold(
+      appBar: AppBar(title: const Text('Shift Detail')),
+      body: ref
+          .watch(shiftSummaryProvider(shiftId))
+          .when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, _) =>
+                const Center(child: Text('Unable to load shift detail')),
+            data: (s) => FutureBuilder(
+              future: Future.wait([
+                ref
+                    .read(shiftRepositoryProvider)
+                    .getShiftCashMovements(shiftId),
+                ref.read(shiftRepositoryProvider).getShiftSales(shiftId),
+              ]),
+              builder: (context, snapshot) {
+                final movements = snapshot.data?[0] ?? [];
+                final sales = snapshot.data?[1] ?? [];
+                return ListView(
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    Text('Status: ${s.shift.status}'),
+                    Text('Gross sales: ${money(s.grossSalesMinor)} THB'),
+                    Text('Expected cash: ${money(s.expectedCashMinor)} THB'),
+                    Text('Closing cash: ${money(s.closingCashMinor ?? 0)} THB'),
+                    Text(
+                      'Difference: ${money(s.cashDifferenceMinor ?? 0)} THB',
                     ),
-                    OutlinedButton(
-                      onPressed: () => context.push('/shifts'),
-                      child: const Text('Shift History'),
-                    ),
+                    Text('Sync: ${_syncStatus(syncPending)}'),
+                    if (s.shift.status == 'closed') ...[
+                      FilledButton(
+                        onPressed: () => context.go('/shift'),
+                        child: const Text('Start New Shift'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => context.push('/shifts'),
+                        child: const Text('Shift History'),
+                      ),
+                    ],
+                    const Divider(),
+                    const Text('Cash movements'),
+                    for (final m in movements)
+                      Text(
+                        '${(m as dynamic).type}: ${money((m as dynamic).amountMinor)}',
+                      ),
+                    const Divider(),
+                    const Text('Sales'),
+                    for (final sale in sales)
+                      Text(
+                        '${(sale as dynamic).receiptNumber}: ${money((sale as dynamic).totalMinor)}',
+                      ),
                   ],
-                  const Divider(),
-                  const Text('Cash movements'),
-                  for (final m in movements)
-                    Text(
-                      '${(m as dynamic).type}: ${money((m as dynamic).amountMinor)}',
-                    ),
-                  const Divider(),
-                  const Text('Sales'),
-                  for (final sale in sales)
-                    Text(
-                      '${(sale as dynamic).receiptNumber}: ${money((sale as dynamic).totalMinor)}',
-                    ),
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
-  );
+    );
+  }
 }

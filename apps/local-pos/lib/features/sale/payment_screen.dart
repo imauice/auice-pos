@@ -44,6 +44,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           .completeCash(paid);
       ref.invalidate(recentSalesProvider);
       ref.invalidate(shiftSummaryProvider(receipt.sale.shiftId));
+      ref.invalidate(shiftSyncPendingProvider(receipt.sale.shiftId));
       if (mounted) context.go('/receipt/${receipt.sale.id}');
     } on SaleException catch (e) {
       if (mounted) setState(() => error = e.message);

@@ -91,7 +91,7 @@ void main() {
     expect(await migrated.select(migrated.products).get(), isEmpty);
     await migrated.close();
   });
-  test('v3 to v6 migration preserves data and creates sale and shift schema', () async {
+  test('v3 to v7 migration preserves data and creates sale and shift schema', () async {
     await db.close();
     final raw = sqlite.sqlite3.openInMemory();
     raw.execute(
@@ -140,6 +140,9 @@ void main() {
         'cash_sales_minor',
         'cash_in_minor',
         'cash_out_minor',
+        'sales_count',
+        'cash_sales_count',
+        'gross_sales_minor',
         'deleted_at',
       }),
     );
@@ -155,6 +158,25 @@ void main() {
       ),
       isNotEmpty,
     );
+    await migrated.close();
+  });
+
+  test('v6 to v7 migration defaults immutable shift summaries safely', () async {
+    await db.close();
+    final raw = sqlite.sqlite3.openInMemory();
+    raw.execute(
+      'CREATE TABLE shifts (id TEXT NOT NULL PRIMARY KEY, branch_id TEXT NOT NULL, device_id TEXT NOT NULL, status TEXT NOT NULL, opened_at INTEGER NOT NULL, closed_at INTEGER NULL, opening_cash_minor INTEGER NOT NULL, cash_sales_minor INTEGER NOT NULL DEFAULT 0, cash_in_minor INTEGER NOT NULL DEFAULT 0, cash_out_minor INTEGER NOT NULL DEFAULT 0, closing_cash_minor INTEGER NULL, expected_cash_minor INTEGER NULL, cash_difference_minor INTEGER NULL, currency TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, version INTEGER NOT NULL, deleted_at INTEGER NULL)',
+    );
+    raw.execute(
+      "INSERT INTO shifts (id,branch_id,device_id,status,opened_at,opening_cash_minor,currency,created_at,updated_at,version) VALUES ('shift','branch','device','closed',0,100,'THB',0,0,2)",
+    );
+    raw.execute('PRAGMA user_version = 6');
+    final migrated = AppDatabase.forTesting(NativeDatabase.opened(raw));
+    final shift = await migrated.select(migrated.shifts).getSingle();
+    expect(shift.id, 'shift');
+    expect(shift.salesCount, 0);
+    expect(shift.cashSalesCount, 0);
+    expect(shift.grossSalesMinor, 0);
     await migrated.close();
   });
 }
