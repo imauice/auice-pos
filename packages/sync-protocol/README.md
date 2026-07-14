@@ -39,3 +39,7 @@ Offline completion writes one `sale` append event containing the immutable Sale,
 ## POS-005 local shift events
 
 Opening writes a version 1 `shift` append event. Closing writes a version 2 `shift` update event containing the final cash snapshots. Each cash-in or cash-out writes a version 1 `cash_movement` append event with a positive integer amount; its type carries direction. Domain data and its event are committed together and remain pending offline. The Cloud endpoint validates and records the event envelope only—it does not apply shift or cash-movement payloads to Cloud domain collections in POS-005.
+
+## POS-006 inventory movement production
+
+Manual opening, receiving, adjustment, and waste operations append version 1 `stock_movement` events containing entered-unit snapshots, rational conversion snapshots, signed canonical base quantity, reason code, reference, and UTC timestamps. The event is atomic with the SQLite movement. Cloud event application, mutable stock totals, and background push remain intentionally absent.

@@ -153,6 +153,8 @@ class Product {
     this.baseUnitId,
     required this.trackStock,
     required this.baseQuantityScale,
+    this.lowStockThresholdMinor,
+    this.lowStockThresholdScale,
     required this.active,
     required this.createdAt,
     required this.updatedAt,
@@ -163,6 +165,7 @@ class Product {
   final String? categoryId, sku, description, baseUnitId;
   final bool trackStock, active;
   final int baseQuantityScale;
+  final int? lowStockThresholdMinor, lowStockThresholdScale;
   final DateTime createdAt, updatedAt;
   final int version;
   final DateTime? deletedAt;
@@ -176,6 +179,8 @@ class Product {
     'baseUnitId': baseUnitId,
     'trackStock': trackStock,
     'baseQuantityScale': baseQuantityScale,
+    'lowStockThresholdMinor': lowStockThresholdMinor,
+    'lowStockThresholdScale': lowStockThresholdScale,
     'active': active,
     'createdAt': iso(createdAt),
     'updatedAt': iso(updatedAt),
@@ -589,6 +594,7 @@ class StockMovement {
     required this.referenceId,
     required this.occurredAt,
     this.note,
+    this.reasonCode,
     required this.createdAt,
     required this.version,
   });
@@ -610,7 +616,7 @@ class StockMovement {
       baseQuantityScale,
       version;
   final DateTime occurredAt, createdAt;
-  final String? note;
+  final String? note, reasonCode;
   Map<String, dynamic> toJson() => {
     'id': id,
     'branchId': branchId,
@@ -630,6 +636,7 @@ class StockMovement {
     'referenceId': referenceId,
     'occurredAt': iso(occurredAt),
     'note': note,
+    'reasonCode': reasonCode,
     'createdAt': iso(createdAt),
     'version': version,
   };

@@ -91,7 +91,7 @@ void main() {
     expect(await migrated.select(migrated.products).get(), isEmpty);
     await migrated.close();
   });
-  test('v3 to v7 migration preserves data and creates sale and shift schema', () async {
+  test('v3 to v8 migration preserves data and creates sale and shift schema', () async {
     await db.close();
     final raw = sqlite.sqlite3.openInMemory();
     raw.execute(
@@ -161,14 +161,29 @@ void main() {
     await migrated.close();
   });
 
-  test('v6 to v7 migration defaults immutable shift summaries safely', () async {
+  test('v6 to v8 migration defaults summaries and adds inventory fields', () async {
     await db.close();
     final raw = sqlite.sqlite3.openInMemory();
     raw.execute(
       'CREATE TABLE shifts (id TEXT NOT NULL PRIMARY KEY, branch_id TEXT NOT NULL, device_id TEXT NOT NULL, status TEXT NOT NULL, opened_at INTEGER NOT NULL, closed_at INTEGER NULL, opening_cash_minor INTEGER NOT NULL, cash_sales_minor INTEGER NOT NULL DEFAULT 0, cash_in_minor INTEGER NOT NULL DEFAULT 0, cash_out_minor INTEGER NOT NULL DEFAULT 0, closing_cash_minor INTEGER NULL, expected_cash_minor INTEGER NULL, cash_difference_minor INTEGER NULL, currency TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, version INTEGER NOT NULL, deleted_at INTEGER NULL)',
     );
     raw.execute(
+      'CREATE TABLE products (id TEXT NOT NULL PRIMARY KEY, base_quantity_scale INTEGER NOT NULL DEFAULT 1)',
+    );
+    raw.execute(
+      'CREATE TABLE stock_movements (id TEXT NOT NULL PRIMARY KEY, branch_id TEXT NOT NULL, device_id TEXT NOT NULL, product_id TEXT NOT NULL, type TEXT NOT NULL, source_unit_id TEXT NOT NULL, source_unit_code_snapshot TEXT NOT NULL, source_unit_name_snapshot TEXT NOT NULL, source_quantity_minor INTEGER NOT NULL, source_quantity_scale INTEGER NOT NULL, conversion_numerator_snapshot INTEGER NOT NULL, conversion_denominator_snapshot INTEGER NOT NULL, base_quantity_minor INTEGER NOT NULL, base_quantity_scale INTEGER NOT NULL, reference_type TEXT NOT NULL, reference_id TEXT NOT NULL, occurred_at INTEGER NOT NULL, note TEXT NULL, created_at INTEGER NOT NULL, version INTEGER NOT NULL)',
+    );
+    raw.execute(
+      'CREATE TABLE sales (id TEXT NOT NULL PRIMARY KEY, branch_id TEXT NOT NULL, device_id TEXT NOT NULL, shift_id TEXT NOT NULL, receipt_number TEXT NOT NULL UNIQUE, status TEXT NOT NULL, currency TEXT NOT NULL, subtotal_minor INTEGER NOT NULL, discount_minor INTEGER NOT NULL, tax_minor INTEGER NOT NULL, total_minor INTEGER NOT NULL, paid_minor INTEGER NOT NULL, change_minor INTEGER NOT NULL, item_count INTEGER NOT NULL, sold_at INTEGER NOT NULL, voided_at INTEGER NULL, void_reason TEXT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, version INTEGER NOT NULL, deleted_at INTEGER NULL)',
+    );
+    raw.execute(
       "INSERT INTO shifts (id,branch_id,device_id,status,opened_at,opening_cash_minor,currency,created_at,updated_at,version) VALUES ('shift','branch','device','closed',0,100,'THB',0,0,2)",
+    );
+    raw.execute(
+      "INSERT INTO stock_movements VALUES ('movement','branch','device','product','sale','unit','each','Each',1,1,1,1,-1,1,'sale','sale',0,NULL,0,1)",
+    );
+    raw.execute(
+      "INSERT INTO sales (id,branch_id,device_id,shift_id,receipt_number,status,currency,subtotal_minor,discount_minor,tax_minor,total_minor,paid_minor,change_minor,item_count,sold_at,created_at,updated_at,version) VALUES ('sale','branch','device','shift','R-1','completed','THB',100,0,0,100,100,0,1,0,0,0,1)",
     );
     raw.execute('PRAGMA user_version = 6');
     final migrated = AppDatabase.forTesting(NativeDatabase.opened(raw));
@@ -177,6 +192,21 @@ void main() {
     expect(shift.salesCount, 0);
     expect(shift.cashSalesCount, 0);
     expect(shift.grossSalesMinor, 0);
+    expect((await migrated.select(migrated.sales).getSingle()).id, 'sale');
+    expect(
+      (await migrated.select(migrated.stockMovements).getSingle()).id,
+      'movement',
+    );
+    expect(
+      raw.select('PRAGMA table_info(products)').map((row) => row['name']),
+      containsAll(['low_stock_threshold_minor', 'low_stock_threshold_scale']),
+    );
+    expect(
+      raw
+          .select('PRAGMA table_info(stock_movements)')
+          .map((row) => row['name']),
+      contains('reason_code'),
+    );
     await migrated.close();
   });
 }

@@ -19,6 +19,8 @@ Map<String, dynamic> productJson({int catalog = 1, String? deletedAt}) => {
   'baseUnitId': bottle,
   'trackStock': true,
   'baseQuantityScale': 1,
+  'lowStockThresholdMinor': 5,
+  'lowStockThresholdScale': 1,
   'active': true,
   'version': catalog,
   'catalogVersion': catalog,
@@ -100,6 +102,10 @@ void main() {
   test('full and incremental imports update version and soft-delete', () async {
     await importer.importPage(page(products: [productJson()]));
     expect(await importer.lastVersion(), 1);
+    expect(
+      (await db.select(db.products).getSingle()).lowStockThresholdMinor,
+      5,
+    );
     await importer.importPage(
       page(
         target: 2,
@@ -110,6 +116,14 @@ void main() {
     );
     expect((await db.select(db.products).getSingle()).deletedAt, isNotNull);
     expect(await importer.lastVersion(), 2);
+  });
+  test('catalog rejects low-stock threshold scale mismatch', () async {
+    final invalid = productJson()..['lowStockThresholdScale'] = 1000;
+    await expectLater(
+      importer.importPage(page(products: [invalid])),
+      throwsA(isA<StateError>()),
+    );
+    expect(await db.select(db.products).get(), isEmpty);
   });
   test('page rollback preserves no partial records', () async {
     final bad = productJson()..remove('name');

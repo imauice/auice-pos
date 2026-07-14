@@ -109,6 +109,10 @@ class _ShiftStartState extends ConsumerState<ShiftStartScreen> {
               onPressed: saving ? null : open,
               child: const Text('Open shift'),
             ),
+            OutlinedButton(
+              onPressed: () => context.push('/inventory'),
+              child: const Text('Inventory'),
+            ),
           ],
         ),
       ),
@@ -152,6 +156,10 @@ class ShiftDashboardScreen extends ConsumerWidget {
                 FilledButton(
                   onPressed: () => context.push('/sale'),
                   child: const Text('Start Sale'),
+                ),
+                FilledButton.tonal(
+                  onPressed: () => context.push('/inventory'),
+                  child: const Text('Inventory'),
                 ),
                 FilledButton.tonal(
                   onPressed: () => context.push('/shift/$shiftId/cash/cash_in'),

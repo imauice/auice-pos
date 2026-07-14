@@ -3,6 +3,7 @@ import {
   ProductUnitSchema,
   CashMovementSchema,
   ShiftSchema,
+  StockMovementSchema,
 } from "../src/domain/schemas/domain.schemas";
 import { model } from "mongoose";
 
@@ -10,6 +11,7 @@ const CashMovementModel = model(
   "CashMovementSchemaSpec",
   CashMovementSchema.clone(),
 );
+const ProductModel = model("InventoryProductSchemaSpec", ProductSchema.clone());
 describe("ProductUnit persistence constraints", () => {
   it("defines a unique partial branch barcode index", () => {
     const barcode = ProductUnitSchema.indexes().find(
@@ -73,5 +75,34 @@ describe("Product canonical stock scale", () => {
   it("defaults baseQuantityScale to one and rejects non-positive scales", () => {
     const path = ProductSchema.path("baseQuantityScale");
     expect(path.options).toMatchObject({ required: true, default: 1, min: 1 });
+  });
+  it("defines optional integer low-stock thresholds", () => {
+    expect(ProductSchema.path("lowStockThresholdMinor").options.min).toBe(0);
+    expect(ProductSchema.path("lowStockThresholdScale").options.min).toBe(1);
+  });
+  it("requires low-stock threshold to use the canonical scale", async () => {
+    const document = new ProductModel({
+      id: "018f4c3a-7a11-7abc-8abc-1234567890ab",
+      branchId: "018f4c3a-7a11-7abc-8abc-1234567890ac",
+      name: "Fabric",
+      baseUnitId: "018f4c3a-7a11-7abc-8abc-1234567890ad",
+      trackStock: true,
+      baseQuantityScale: 1000,
+      lowStockThresholdMinor: 5000,
+      lowStockThresholdScale: 1,
+      active: true,
+      catalogVersion: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      version: 1,
+    });
+    await expect(document.validate()).rejects.toThrow(
+      "Low-stock threshold must use the canonical scale",
+    );
+  });
+  it("defines inventory adjustment reasons on stock movements", () => {
+    expect(StockMovementSchema.path("reasonCode").options.enum).toContain(
+      "physical_count",
+    );
   });
 });

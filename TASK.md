@@ -77,7 +77,7 @@ Status: Approved
 
 # POS-005 — Shift, Cash Management and Daily Closing
 
-Status: Submitted for Review
+Status: Approved
 
 - [x] Add CashMovement and closing snapshot schemas with v6 migration and indexes
 - [x] Implement explicit open-shift, cash-movement, summary, and close services
@@ -93,3 +93,17 @@ Status: Submitted for Review
 - [x] Require positive integer Cloud cash-movement amounts
 - [x] Persist immutable count and gross-sale closing snapshots with v7 migration
 - [x] Preserve atomic shift operations and existing sale behavior
+
+# POS-006 — Stock Balance, Inventory Adjustments and Movement Ledger
+
+Status: Submitted for Review
+
+- [x] Add v8 low-stock and movement-reason migration with inventory indexes
+- [x] Derive canonical branch/product balances from append-only movements
+- [x] Implement exact multi-unit display and visible negative-stock states
+- [x] Implement offline opening, receiving, adjustments, waste, and atomic outbox writes
+- [x] Add bounded repositories, filtered running-balance ledger, and movement detail
+- [x] Add Riverpod inventory screens and navigation independent of sales shifts
+- [x] Add Cloud inventory contracts and catalog threshold import
+- [x] Add scenario, rollback, migration, repository, and widget coverage
+- [x] Complete required verification and submit for review

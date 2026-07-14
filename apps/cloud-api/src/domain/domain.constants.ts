@@ -47,6 +47,16 @@ export const STOCK_MOVEMENT_TYPES = [
   "transfer_out",
   "waste",
 ] as const;
+export const INVENTORY_ADJUSTMENT_REASONS = [
+  "physical_count",
+  "damaged",
+  "expired",
+  "lost",
+  "found",
+  "data_correction",
+  "internal_use",
+  "other",
+] as const;
 export const POSITIVE_MOVEMENTS = new Set([
   "opening",
   "purchase",

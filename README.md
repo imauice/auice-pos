@@ -35,6 +35,8 @@ Every Product has a positive canonical `baseQuantityScale` used by all of its Sa
 
 POS-005 replaces the development shift with an explicit offline shift lifecycle. A configured active branch/device opens a shift with counted opening cash, sales require that open shift, cash-in/out movements are append-only, and closing stores immutable cash snapshots and the counted difference. Shift, cash-movement, sale, and stock events enter the local outbox atomically; cloud availability is never consulted by these workflows. Shift cancellation is intentionally deferred.
 
+POS-006 derives inventory exclusively from the append-only StockMovement ledger. Receiving, opening stock, adjustments, and waste work offline and atomically create pending outbox events. Balances use canonical integer scales, retain negative quantities, expose low/out/negative status, and provide derived largest-package-plus-base-unit display without mutating Product stock.
+
 ## Development workflow
 
 Keep work task-focused, add migrations for database changes, validate inputs, use UTC internally, and add automated tests for business rules. Run lint, tests, builds, Flutter analysis, and Compose validation before delivery. Never commit real `.env` files or credentials.

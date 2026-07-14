@@ -100,3 +100,21 @@ Future Cloud Sync
 SQLite enforces one open shift per device with a partial unique index in addition to the service guard. Opening, cash movement, and closing each pair their domain write with an outbox event in one transaction. SQLite serializes writes on the connection; closing calculates its summary and conditionally changes `status = open` within the same transaction, so a competing sale or close cannot leave a partially reconciled shift.
 
 Open summaries are derived from completed local sales, cash payments, and append-only cash movements. A cash sale contributes tender minus change. Closing persists sales count, cash-sales count, gross sales, `cashSalesMinor`, `cashInMinor`, `cashOutMinor`, `expectedCashMinor`, closing cash, and difference; closed summaries return only these reconciliation snapshots. A shift is pending sync when its shift event or any related sale, cash movement, or sale stock-movement event is pending or processing. Cancellation, refunds, Cloud event application, and background synchronization remain deferred.
+
+POS-006 inventory flow:
+
+```text
+Receiving / Sale / Adjustment
+           ↓
+Append StockMovement
+           ↓
+Sync Outbox
+           ↓
+SUM Canonical Base Quantity
+           ↓
+Current Stock Balance
+           ↓
+Derived Multi-Unit Display
+```
+
+No mutable stock total is stored on Product. Branch/product balances use SQL aggregation over committed signed movements and reject mixed canonical scales. Display decomposition greedily uses the largest active exact package, then the base unit; intermediate packages are intentionally skipped. Ledger pages are bounded and calculate running balances with a SQLite window function. Product names in ledger lists are current catalog names, while unit and conversion fields come from immutable movement snapshots. Negative balances are valid and visible because sale blocking remains out of scope.

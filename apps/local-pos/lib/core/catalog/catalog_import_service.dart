@@ -44,6 +44,14 @@ class CatalogImportService {
           );
     }
     for (final j in page.products) {
+      final baseScale = j['baseQuantityScale'] as int? ?? 1;
+      final thresholdMinor = j['lowStockThresholdMinor'] as int?;
+      final thresholdScale = j['lowStockThresholdScale'] as int?;
+      if ((thresholdMinor == null) != (thresholdScale == null) ||
+          (thresholdMinor != null &&
+              (thresholdMinor < 0 || thresholdScale != baseScale))) {
+        throw StateError('Low-stock threshold must use canonical scale');
+      }
       await db
           .into(db.products)
           .insertOnConflictUpdate(
@@ -56,7 +64,9 @@ class CatalogImportService {
               description: Value(j['description'] as String?),
               baseUnitId: Value(j['baseUnitId'] as String?),
               trackStock: j['trackStock'] as bool,
-              baseQuantityScale: Value(j['baseQuantityScale'] as int? ?? 1),
+              baseQuantityScale: Value(baseScale),
+              lowStockThresholdMinor: Value(thresholdMinor),
+              lowStockThresholdScale: Value(thresholdScale),
               active: j['active'] as bool,
               version: j['version'] as int,
               catalogVersion: j['catalogVersion'] as int,

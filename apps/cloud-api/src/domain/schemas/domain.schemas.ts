@@ -8,6 +8,7 @@ import {
   SALE_STATUSES,
   SHIFT_STATUSES,
   STOCK_MOVEMENT_TYPES,
+  INVENTORY_ADJUSTMENT_REASONS,
   UNIT_CATEGORIES,
   UUID_PATTERN,
 } from "../domain.constants";
@@ -88,6 +89,8 @@ export const ProductSchema = new Schema(
       min: 1,
       validate: Number.isInteger,
     },
+    lowStockThresholdMinor: { type: Number, min: 0, validate: Number.isInteger },
+    lowStockThresholdScale: { type: Number, min: 1, validate: Number.isInteger },
     active: { type: Boolean, required: true },
     catalogVersion: integer(1),
   },
@@ -104,6 +107,8 @@ ProductSchema.pre(
     trackStock: boolean;
     baseUnitId?: string | null;
     baseQuantityScale?: number;
+    lowStockThresholdMinor?: number | null;
+    lowStockThresholdScale?: number | null;
   }) {
     if (this.trackStock && !this.baseUnitId)
       throw new Error("Stock-tracked products require baseUnitId");
@@ -115,6 +120,11 @@ ProductSchema.pre(
       throw new Error(
         "Stock-tracked products require a positive baseQuantityScale",
       );
+    const hasThreshold = this.lowStockThresholdMinor != null;
+    if (hasThreshold !== (this.lowStockThresholdScale != null))
+      throw new Error("Low-stock threshold requires both quantity and scale");
+    if (hasThreshold && this.lowStockThresholdScale !== this.baseQuantityScale)
+      throw new Error("Low-stock threshold must use the canonical scale");
   },
 );
 
@@ -313,6 +323,7 @@ export const StockMovementSchema = new Schema(
     referenceId: { type: String, required: true },
     occurredAt: { type: Date, required: true },
     note: String,
+    reasonCode: { type: String, enum: INVENTORY_ADJUSTMENT_REASONS },
     createdAt: { type: Date, required: true },
     version: integer(1),
   },

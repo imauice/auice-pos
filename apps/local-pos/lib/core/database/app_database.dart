@@ -74,6 +74,8 @@ class Products extends Table {
   TextColumn get baseUnitId => text().nullable()();
   BoolColumn get trackStock => boolean()();
   IntColumn get baseQuantityScale => integer().withDefault(const Constant(1))();
+  IntColumn get lowStockThresholdMinor => integer().nullable()();
+  IntColumn get lowStockThresholdScale => integer().nullable()();
   BoolColumn get active => boolean()();
   IntColumn get version => integer()();
   IntColumn get catalogVersion => integer()();
@@ -252,6 +254,7 @@ class StockMovements extends Table {
   TextColumn get referenceId => text()();
   DateTimeColumn get occurredAt => dateTime()();
   TextColumn get note => text().nullable()();
+  TextColumn get reasonCode => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   IntColumn get version => integer()();
   @override
@@ -288,7 +291,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -299,6 +302,7 @@ class AppDatabase extends _$AppDatabase {
       await _createCatalogIndexes();
       await _createSaleIndexes();
       await _createShiftIndexes();
+      await _createInventoryIndexes();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
@@ -338,9 +342,19 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(shifts, shifts.cashSalesCount);
         await m.addColumn(shifts, shifts.grossSalesMinor);
       }
+      if (from >= 3 && from < 8) {
+        await m.addColumn(products, products.lowStockThresholdMinor);
+        await m.addColumn(products, products.lowStockThresholdScale);
+      }
+      if (from >= 4 && from < 8) {
+        await m.addColumn(stockMovements, stockMovements.reasonCode);
+      }
       if (from < 6) {
         await m.createTable(cashMovements);
         await _createShiftIndexes();
+      }
+      if (from < 8) {
+        await _createInventoryIndexes();
       }
     },
   );
@@ -395,6 +409,18 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX cash_movements_branch_device_idx ON cash_movements(branch_id, device_id)',
+    );
+  }
+
+  Future<void> _createInventoryIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS stock_movements_branch_product_occurred_idx ON stock_movements(branch_id, product_id, occurred_at DESC)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS stock_movements_product_type_idx ON stock_movements(product_id, type)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS stock_movements_branch_occurred_idx ON stock_movements(branch_id, occurred_at DESC)',
     );
   }
 
