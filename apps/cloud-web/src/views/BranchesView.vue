@@ -1,32 +1,26 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-interface Branch {
-  id: string;
-  code: string;
-  name: string;
-  timezone: string;
-  currency: string;
-  active: boolean;
-}
+import { fetchBranches, type Branch } from "../api/master-data";
 const rows = ref<Branch[]>([]);
 const error = ref("");
+const loading = ref(true);
 onMounted(async () => {
   try {
-    const base =
-      import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
-    const response = await globalThis.fetch(`${base}/branches`);
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    rows.value = (await response.json()) as Branch[];
+    rows.value = await fetchBranches();
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Unable to load branches";
+  } finally {
+    loading.value = false;
   }
 });
 </script>
 <template>
   <main>
     <h1>Branches</h1>
+    <p v-if="loading" role="status">Loading branches…</p>
     <p v-if="error" class="error">{{ error }}</p>
-    <table>
+    <p v-else-if="!loading && !rows.length">No branches found.</p>
+    <table v-else-if="!loading">
       <thead>
         <tr>
           <th>Code</th>

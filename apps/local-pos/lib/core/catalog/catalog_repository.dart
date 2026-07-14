@@ -1,5 +1,6 @@
 import 'package:auice_pos/core/database/app_database.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class BarcodeCatalogResult {
   const BarcodeCatalogResult(this.product, this.unit, this.price);
@@ -88,3 +89,7 @@ class CatalogRepository {
           ))
           .getSingleOrNull();
 }
+
+final catalogRepositoryProvider = Provider<CatalogRepository>(
+  (ref) => CatalogRepository(ref.watch(databaseProvider)),
+);

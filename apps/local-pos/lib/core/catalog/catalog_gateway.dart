@@ -1,6 +1,7 @@
 import 'package:auice_pos/config/app_config.dart';
 import 'package:auice_pos/core/catalog/catalog_page.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class RegistrationResult {
   const RegistrationResult({
@@ -83,3 +84,9 @@ class DioCatalogGateway implements CatalogGateway {
     return CatalogPage.fromJson(response.data!);
   }
 }
+
+final catalogGatewayProvider = Provider<CatalogGateway>((ref) {
+  final gateway = DioCatalogGateway();
+  ref.onDispose(gateway.dio.close);
+  return gateway;
+});

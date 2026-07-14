@@ -245,8 +245,8 @@ LazyDatabase _openConnection() => LazyDatabase(() async {
   );
 });
 
-final databaseProvider = Provider<AppDatabase>(
-  (ref) => throw UnimplementedError(
-    'Database must be initialized before app startup',
-  ),
-);
+final databaseProvider = Provider<AppDatabase>((ref) {
+  final database = AppDatabase();
+  ref.onDispose(database.close);
+  return database;
+});

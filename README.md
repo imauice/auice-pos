@@ -27,7 +27,7 @@ Start services from the root with `docker compose up -d`. Run the API with `cd a
 
 The API health endpoint is `GET http://localhost:3000/api/health`; Swagger is at `http://localhost:3000/api/docs`. Sync protocol v1 accepts validated, idempotent event batches at `POST http://localhost:3000/api/sync/push`. Nest's default 100 KB JSON body limit and a 100-event batch limit protect the endpoint. The website reads `VITE_API_BASE_URL`, while the API reads the values documented in its `.env.example`.
 
-POS-003 adds `GET /api/branches`, `GET /api/branches/:id`, `POST /api/device/register`, and snapshot-paginated `GET /api/catalog`. Flutter configuration also supports `BRANCH_CODE`, `DEVICE_NAME`, `DEVICE_PLATFORM`, and `APP_VERSION` through `--dart-define`. Startup makes the local catalog usable first, then registers and resumes catalog synchronization when online. A first run without a catalog and network reports setup-required instead of sale readiness.
+POS-003 adds `GET /api/branches`, `GET /api/branches/:id`, `POST /api/device/register`, snapshot-paginated `GET /api/catalog`, and branch-scoped paginated read-only views under `GET /api/catalog-view/:kind` and `GET /api/device`. Flutter configuration also supports `BRANCH_CODE`, `DEVICE_NAME`, `DEVICE_PLATFORM`, and `APP_VERSION` through `--dart-define`. Startup makes the local catalog usable first, then registers and resumes catalog synchronization when online. A first run without a catalog and network reports setup-required instead of sale readiness.
 
 ## Development workflow
 

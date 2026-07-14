@@ -16,19 +16,23 @@ DeviceSchema.index({ branchId: 1, code: 1 }, { unique: true });
 
 export const CategorySchema = new Schema({ ...syncableFields, name: { type: String, required: true }, description: String, sortOrder: integer(0), active: { type: Boolean, required: true }, catalogVersion: integer(1) }, options);
 CategorySchema.index({ branchId: 1, active: 1 });
+CategorySchema.index({ branchId: 1, catalogVersion: 1, id: 1 });
 
 export const ProductSchema = new Schema({ ...syncableFields, categoryId: optionalUuid, sku: String, name: { type: String, required: true }, description: String, baseUnitId: optionalUuid, trackStock: { type: Boolean, required: true }, active: { type: Boolean, required: true }, catalogVersion: integer(1) }, options);
 ProductSchema.index({ branchId: 1, sku: 1 }, { unique: true, partialFilterExpression: { sku: { $type: 'string' } } });
+ProductSchema.index({ branchId: 1, catalogVersion: 1, id: 1 });
 ProductSchema.pre('validate', function (this: { trackStock: boolean; baseUnitId?: string | null }) { if (this.trackStock && !this.baseUnitId) throw new Error('Stock-tracked products require baseUnitId'); });
 
 export const ProductUnitSchema = new Schema({ ...syncableFields, productId: { type: String, required: true, match: UUID_PATTERN }, code: { type: String, required: true }, name: { type: String, required: true }, unitCategory: { type: String, enum: UNIT_CATEGORIES, required: true }, isBaseUnit: { type: Boolean, required: true }, conversionNumerator: integer(1), conversionDenominator: integer(1), barcode: String, allowSale: { type: Boolean, required: true }, allowPurchase: { type: Boolean, required: true }, active: { type: Boolean, required: true }, catalogVersion: integer(1) }, options);
 ProductUnitSchema.index({ branchId: 1, barcode: 1 }, { unique: true, partialFilterExpression: { barcode: { $type: 'string' } } });
 ProductUnitSchema.index({ productId: 1 }); ProductUnitSchema.index({ productId: 1, active: 1 });
+ProductUnitSchema.index({ branchId: 1, catalogVersion: 1, id: 1 });
 ProductUnitSchema.index({ productId: 1, isBaseUnit: 1 }, { unique: true, partialFilterExpression: { isBaseUnit: true, deletedAt: null } });
 ProductUnitSchema.pre('validate', function (this: { isBaseUnit: boolean; conversionNumerator: number; conversionDenominator: number }) { if (this.isBaseUnit && (this.conversionNumerator !== 1 || this.conversionDenominator !== 1)) throw new Error('Base unit conversion must be 1 / 1'); });
 
 export const ProductPriceSchema = new Schema({ ...syncableFields, productId: { type: String, required: true, match: UUID_PATTERN }, productUnitId: { type: String, required: true, match: UUID_PATTERN }, priceMinor: money, currency: { type: String, enum: CURRENCY, required: true }, effectiveFrom: { type: Date, required: true }, effectiveTo: Date, active: { type: Boolean, required: true }, catalogVersion: integer(1) }, options);
 ProductPriceSchema.index({ productId: 1, productUnitId: 1 }); ProductPriceSchema.index({ branchId: 1, productUnitId: 1, effectiveFrom: 1 });
+ProductPriceSchema.index({ branchId: 1, catalogVersion: 1, id: 1 });
 
 export const ShiftSchema = new Schema({ ...syncableFields, deviceId: { type: String, required: true, match: UUID_PATTERN }, openedByEmployeeId: String, closedByEmployeeId: String, status: { type: String, enum: SHIFT_STATUSES, required: true }, openedAt: { type: Date, required: true }, closedAt: Date, openingCashMinor: money, closingCashMinor: money, expectedCashMinor: money, cashDifferenceMinor: integer(), currency: { type: String, enum: CURRENCY, required: true } }, options);
 

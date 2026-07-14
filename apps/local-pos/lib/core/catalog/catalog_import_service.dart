@@ -1,6 +1,7 @@
 import 'package:auice_pos/core/catalog/catalog_page.dart';
 import 'package:auice_pos/core/database/app_database.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class CatalogImportService {
   CatalogImportService(this.db);
@@ -115,11 +116,6 @@ class CatalogImportService {
         throw StateError('A non-final page requires nextCursor');
       }
       await _metadata('pending_catalog_cursor', page.nextCursor!, now);
-      await _metadata(
-        'pending_catalog_target_version',
-        page.targetVersion.toString(),
-        now,
-      );
     } else {
       await _metadata(
         'last_catalog_version',
@@ -127,7 +123,6 @@ class CatalogImportService {
         now,
       );
       await _metadata('pending_catalog_cursor', '', now);
-      await _metadata('pending_catalog_target_version', '', now);
     }
   });
   Future<void> _metadata(String key, String value, DateTime now) => db
@@ -149,3 +144,7 @@ class CatalogImportService {
     return row == null || row.value.isEmpty ? null : row.value;
   }
 }
+
+final catalogImportServiceProvider = Provider<CatalogImportService>(
+  (ref) => CatalogImportService(ref.watch(databaseProvider)),
+);

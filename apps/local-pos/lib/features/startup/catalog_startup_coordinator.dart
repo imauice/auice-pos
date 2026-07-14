@@ -32,6 +32,7 @@ class CatalogStartupCoordinator {
   }
 
   Future<void> start() async {
+    await db.initialize();
     _state(CatalogStartupState.loadingLocal);
     final hasLocal = (await db.select(db.products).get()).isNotEmpty;
     if (hasLocal) _state(CatalogStartupState.readyOffline);
@@ -93,9 +94,27 @@ class CatalogStartupCoordinator {
   }
 }
 
-final catalogStartupCoordinatorProvider = Provider<CatalogStartupCoordinator?>(
-  (ref) => null,
+final catalogStartupCoordinatorProvider = Provider<CatalogStartupCoordinator>(
+  (ref) => CatalogStartupCoordinator(
+    db: ref.watch(databaseProvider),
+    gateway: ref.watch(catalogGatewayProvider),
+    importer: ref.watch(catalogImportServiceProvider),
+  ),
 );
-final catalogStartupStateProvider = StateProvider<CatalogStartupState>(
-  (ref) => CatalogStartupState.loadingLocal,
-);
+
+class CatalogStartupStateController extends StateNotifier<CatalogStartupState> {
+  CatalogStartupStateController(this.coordinator)
+    : super(CatalogStartupState.loadingLocal) {
+    coordinator.onState = (next) => state = next;
+  }
+  final CatalogStartupCoordinator coordinator;
+
+  Future<void> start() => coordinator.start();
+}
+
+final catalogStartupStateProvider =
+    StateNotifierProvider<CatalogStartupStateController, CatalogStartupState>(
+      (ref) => CatalogStartupStateController(
+        ref.watch(catalogStartupCoordinatorProvider),
+      ),
+    );

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { RegisterDeviceDto } from "./dto/register-device.dto";
+import { ReadOnlyQueryDto } from "./dto/read-only-query.dto";
 interface BranchRecord {
   id: string;
   code: string;
@@ -76,13 +77,25 @@ export class DeviceService {
       registered: true,
     };
   }
-  async list() {
+  async list(query: ReadOnlyQueryDto) {
+    const cursor = query.cursor
+      ? this.decodeListCursor(query.cursor)
+      : undefined;
+    if (cursor && cursor.branchId !== query.branchId)
+      throw new BadRequestException("Cursor does not match requested branchId");
     const rows = await this.devices
-      .find({ deletedAt: null })
-      .sort({ updatedAt: -1 })
+      .find({
+        branchId: query.branchId,
+        deletedAt: null,
+        ...(cursor ? { id: { $gt: cursor.lastId } } : {}),
+      })
+      .sort({ id: 1 })
+      .limit(query.limit + 1)
       .lean()
       .exec();
-    return rows.map((row) => ({
+    const hasMore = rows.length > query.limit;
+    const page = rows.slice(0, query.limit);
+    const items = page.map((row) => ({
       id: row.id,
       branchId: row.branchId,
       name: row.name,
@@ -91,5 +104,35 @@ export class DeviceService {
       active: row.active,
       version: row.version,
     }));
+    return {
+      items,
+      nextCursor: hasMore
+        ? Buffer.from(
+            JSON.stringify({
+              branchId: query.branchId,
+              lastId: page.at(-1)!.id,
+            }),
+          ).toString("base64url")
+        : undefined,
+    };
+  }
+
+  private decodeListCursor(value: string): {
+    branchId: string;
+    lastId: string;
+  } {
+    try {
+      const cursor = JSON.parse(
+        Buffer.from(value, "base64url").toString(),
+      ) as Record<string, unknown>;
+      if (
+        typeof cursor.branchId !== "string" ||
+        typeof cursor.lastId !== "string"
+      )
+        throw new Error();
+      return cursor as { branchId: string; lastId: string };
+    } catch {
+      throw new BadRequestException("Invalid cursor");
+    }
   }
 }

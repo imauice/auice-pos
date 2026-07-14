@@ -30,7 +30,7 @@ Status: Approved
 
 # POS-003 — Branch, Device Registration, Product Catalog and Initial Pull Sync
 
-Status: In Progress
+Status: Approved
 
 - [x] Add explicit Branch list/get APIs
 - [x] Add conflict-safe idempotent device registration
@@ -43,3 +43,12 @@ Status: In Progress
 - [x] Add Cloud Web read-only master-data routes
 - [x] Add cloud and Flutter coverage for POS-003 behavior
 - [x] Complete and record final verification
+
+## POS-003-FIX
+
+- [x] Bound catalog keyset queries per entity collection
+- [x] Bind catalog cursors to branch and starting version
+- [x] Complete paginated Cloud Web read-only pages and APIs
+- [x] Persist only the pending catalog cursor for interrupted pulls
+- [x] Wire catalog startup and dependencies through Riverpod
+- [x] Verify Cloud API, Cloud Web, and Flutter commands

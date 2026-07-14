@@ -7,15 +7,17 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeGateway implements CatalogGateway {
-  FakeGateway(this.online, {this.pages = const []});
+  FakeGateway(this.online, {this.pages = const [], this.catalogVersion = 1});
   final bool online;
   final List<CatalogPage> pages;
+  final int catalogVersion;
   int pulls = 0;
+  final cursors = <String?>[];
   @override
   Future<bool> isOnline() async => online;
   @override
   Future<RegistrationResult> register(String id) async =>
-      const RegistrationResult(branchId: 'branch', catalogVersion: 1);
+      RegistrationResult(branchId: 'branch', catalogVersion: catalogVersion);
   @override
   Future<Map<String, dynamic>> fetchBranch(String id) async => {
     'id': id,
@@ -32,7 +34,10 @@ class FakeGateway implements CatalogGateway {
     required String branchId,
     required int fromVersion,
     String? cursor,
-  }) async => pages[pulls++];
+  }) async {
+    cursors.add(cursor);
+    return pages[pulls++];
+  }
 }
 
 void main() {
@@ -111,4 +116,62 @@ void main() {
     expect(await db.select(db.products).get(), hasLength(1));
     expect(await CatalogImportService(db).lastVersion(), 1);
   });
+  test(
+    'recreated coordinator resumes persisted cursor and only then finalizes',
+    () async {
+      final firstImporter = CatalogImportService(db);
+      await firstImporter.importPage(
+        CatalogPage(
+          fromVersion: 0,
+          targetVersion: 3,
+          hasMore: true,
+          nextCursor: 'persisted-cursor',
+          categories: const [],
+          products: [
+            {
+              'id': 'p',
+              'branchId': 'branch',
+              'categoryId': null,
+              'sku': 'S',
+              'name': 'First page',
+              'description': null,
+              'baseUnitId': null,
+              'trackStock': false,
+              'active': true,
+              'version': 1,
+              'catalogVersion': 1,
+              'updatedAt': '2026-01-01T00:00:00.000Z',
+              'deletedAt': null,
+            },
+          ],
+          productUnits: const [],
+          productPrices: const [],
+        ),
+      );
+      expect(await firstImporter.lastVersion(), 0);
+
+      final finalPage = CatalogPage(
+        fromVersion: 0,
+        targetVersion: 3,
+        hasMore: false,
+        categories: const [],
+        products: const [],
+        productUnits: const [],
+        productPrices: const [],
+      );
+      final gateway = FakeGateway(true, pages: [finalPage], catalogVersion: 3);
+      final recreatedImporter = CatalogImportService(db);
+      final recreatedCoordinator = CatalogStartupCoordinator(
+        db: db,
+        gateway: gateway,
+        importer: recreatedImporter,
+      );
+      await recreatedCoordinator.start();
+
+      expect(gateway.cursors, ['persisted-cursor']);
+      expect(await recreatedImporter.pendingCursor(), isNull);
+      expect(await recreatedImporter.lastVersion(), 3);
+      expect(recreatedCoordinator.state, CatalogStartupState.readyOnline);
+    },
+  );
 }

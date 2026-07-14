@@ -15,14 +15,9 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
   void initState() {
     super.initState();
     Future.microtask(() {
-      final coordinator = ref.read(catalogStartupCoordinatorProvider);
-      if (coordinator == null) return;
-      coordinator.onState = (state) {
-        if (mounted) {
-          ref.read(catalogStartupStateProvider.notifier).state = state;
-        }
-      };
-      unawaited(coordinator.start());
+      if (mounted) {
+        unawaited(ref.read(catalogStartupStateProvider.notifier).start());
+      }
     });
   }
 

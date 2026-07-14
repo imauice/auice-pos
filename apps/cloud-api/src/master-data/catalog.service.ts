@@ -13,6 +13,7 @@ interface BranchRecord {
 }
 type Kind = "categories" | "products" | "productUnits" | "productPrices";
 interface Cursor {
+  branchId: string;
   fromVersion: number;
   targetVersion: number;
   lastCatalogVersion: number;
@@ -41,21 +42,31 @@ export class CatalogService {
       .exec();
     if (!branch) throw new BadRequestException("Unknown branch");
     const cursor = query.cursor ? this.decodeCursor(query.cursor) : undefined;
+    if (cursor && cursor.branchId !== query.branchId)
+      throw new BadRequestException("Cursor does not match requested branchId");
     if (cursor && cursor.fromVersion !== query.catalogVersion)
       throw new BadRequestException(
         "Cursor does not match requested catalogVersion",
       );
     const fromVersion = cursor?.fromVersion ?? query.catalogVersion;
     const targetVersion = cursor?.targetVersion ?? branch.currentCatalogVersion;
-    const filter = {
-      branchId: query.branchId,
-      catalogVersion: { $gt: fromVersion, $lte: targetVersion },
-    };
     const groups = await Promise.all([
-      this.categories.find(filter).select("-_id -__v").lean().exec(),
-      this.products.find(filter).select("-_id -__v").lean().exec(),
-      this.units.find(filter).select("-_id -__v").lean().exec(),
-      this.prices.find(filter).select("-_id -__v").lean().exec(),
+      this.candidates(
+        this.categories,
+        "categories",
+        query,
+        targetVersion,
+        cursor,
+      ),
+      this.candidates(this.products, "products", query, targetVersion, cursor),
+      this.candidates(this.units, "productUnits", query, targetVersion, cursor),
+      this.candidates(
+        this.prices,
+        "productPrices",
+        query,
+        targetVersion,
+        cursor,
+      ),
     ]);
     const combined = groups
       .flatMap((records, index) =>
@@ -67,13 +78,12 @@ export class CatalogService {
           a.kind.localeCompare(b.kind) ||
           a.record.id.localeCompare(b.record.id),
       );
-    const remaining = cursor
-      ? combined.filter((item) =>
-          this.afterCursor(item.kind, item.record, cursor),
-        )
-      : combined;
-    const page = remaining.slice(0, query.limit);
-    const hasMore = remaining.length > page.length;
+    const page = combined.slice(0, query.limit);
+    // Each collection is capped at the requested page size. A completely full
+    // merged page may conservatively produce one final empty page, but never an
+    // unbounded query.
+    const hasMore =
+      combined.length > page.length || page.length === query.limit;
     const response: {
       fromVersion: number;
       targetVersion: number;
@@ -97,6 +107,7 @@ export class CatalogService {
       const last = page.at(-1);
       if (last)
         response.nextCursor = this.encodeCursor({
+          branchId: query.branchId,
           fromVersion,
           targetVersion,
           lastCatalogVersion: last.record.catalogVersion,
@@ -106,13 +117,49 @@ export class CatalogService {
     }
     return response;
   }
-  private afterCursor(kind: Kind, record: CatalogRecord, cursor: Cursor) {
-    return (
-      record.catalogVersion > cursor.lastCatalogVersion ||
-      (record.catalogVersion === cursor.lastCatalogVersion &&
-        (kind > cursor.lastEntityType ||
-          (kind === cursor.lastEntityType && record.id > cursor.lastId)))
-    );
+  private candidates(
+    model: Model<CatalogRecord>,
+    kind: Kind,
+    query: CatalogQueryDto,
+    targetVersion: number,
+    cursor?: Cursor,
+  ): Promise<CatalogRecord[]> {
+    const catalogVersion: Record<string, number> = {
+      $gt: query.catalogVersion,
+      $lte: targetVersion,
+    };
+    const filter: Record<string, unknown> = {
+      branchId: query.branchId,
+      catalogVersion,
+    };
+    if (cursor) {
+      const equalVersionPosition =
+        kind > cursor.lastEntityType
+          ? { catalogVersion: cursor.lastCatalogVersion }
+          : kind === cursor.lastEntityType
+            ? {
+                catalogVersion: cursor.lastCatalogVersion,
+                id: { $gt: cursor.lastId },
+              }
+            : undefined;
+      filter.$or = [
+        {
+          catalogVersion: {
+            $gt: cursor.lastCatalogVersion,
+            $lte: targetVersion,
+          },
+        },
+        ...(equalVersionPosition ? [equalVersionPosition] : []),
+      ];
+      delete filter.catalogVersion;
+    }
+    return model
+      .find(filter)
+      .sort({ catalogVersion: 1, id: 1 })
+      .limit(query.limit)
+      .select("-_id -__v")
+      .lean()
+      .exec();
   }
   private encodeCursor(cursor: Cursor) {
     return Buffer.from(JSON.stringify(cursor)).toString("base64url");
@@ -126,7 +173,13 @@ export class CatalogService {
         !Number.isInteger(cursor.fromVersion) ||
         !Number.isInteger(cursor.targetVersion) ||
         !Number.isInteger(cursor.lastCatalogVersion) ||
+        (cursor.fromVersion ?? -1) < 0 ||
+        (cursor.targetVersion ?? -1) < (cursor.fromVersion ?? 0) ||
+        (cursor.lastCatalogVersion ?? -1) <= (cursor.fromVersion ?? 0) ||
+        (cursor.lastCatalogVersion ?? 0) > (cursor.targetVersion ?? -1) ||
         !kinds.includes(cursor.lastEntityType as Kind) ||
+        typeof cursor.branchId !== "string" ||
+        cursor.branchId.length === 0 ||
         typeof cursor.lastId !== "string"
       )
         throw new Error();
