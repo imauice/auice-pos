@@ -50,7 +50,10 @@ class SaleRepository {
     return ReceiptData(
       sale: sale,
       branchName:
-          (await (db.select(db.branches)..where((row) => row.id.equals(sale.branchId))).getSingleOrNull())?.name ??
+          (await (db.select(db.branches)
+                    ..where((row) => row.id.equals(sale.branchId)))
+                  .getSingleOrNull())
+              ?.name ??
           sale.branchId,
       items: await getSaleItems(saleId),
       payments: await getSalePayments(saleId),

@@ -55,7 +55,7 @@ Status: Approved
 
 # POS-004 — Offline Sale Transaction, Cart and Receipt Foundation
 
-Status: Approved
+Status: Submitted for Review
 
 - [x] Add Drift v4 shift, sale, line, payment, movement, and receipt-sequence tables
 - [x] Implement local cart, exact integer calculations, and multi-unit behavior
@@ -65,3 +65,12 @@ Status: Approved
 - [x] Add sale, payment, receipt, history, and receipt-detail screens
 - [x] Add scenario, rollback, migration, repository, and offline UI tests
 - [x] Complete and record final verification
+
+## POS-004-FIX
+
+- [x] Add canonical Product base quantity scale and v5 migration
+- [x] Centralize cart-option and checkout catalog integrity validation
+- [x] Persist canonical scale through sale, movement, and sync snapshots
+- [x] Replace floating-point UI money formatting with integer formatting
+- [x] Add weighted, relationship, effective-price, formatting, and rollback tests
+- [x] Complete final verification and submit for review

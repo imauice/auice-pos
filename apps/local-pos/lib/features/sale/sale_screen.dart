@@ -1,13 +1,12 @@
 import 'package:auice_pos/core/catalog/catalog_repository.dart';
 import 'package:auice_pos/core/database/app_database.dart';
 import 'package:auice_pos/features/sale/cart.dart';
+import 'package:auice_pos/features/sale/money_formatter.dart';
 import 'package:auice_pos/features/sale/shift_service.dart';
 import 'package:auice_pos/features/startup/cloud_connection_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-String money(int minor) => (minor / 100).toStringAsFixed(2);
 
 class SaleScreen extends ConsumerStatefulWidget {
   const SaleScreen({super.key});

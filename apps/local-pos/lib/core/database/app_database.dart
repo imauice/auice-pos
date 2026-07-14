@@ -73,6 +73,7 @@ class Products extends Table {
   TextColumn get description => text().nullable()();
   TextColumn get baseUnitId => text().nullable()();
   BoolColumn get trackStock => boolean()();
+  IntColumn get baseQuantityScale => integer().withDefault(const Constant(1))();
   BoolColumn get active => boolean()();
   IntColumn get version => integer()();
   IntColumn get catalogVersion => integer()();
@@ -262,7 +263,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -296,6 +297,9 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(stockMovements);
         await m.createTable(receiptSequences);
         await _createSaleIndexes();
+      }
+      if (from >= 3 && from < 5) {
+        await m.addColumn(products, products.baseQuantityScale);
       }
     },
   );

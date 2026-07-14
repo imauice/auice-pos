@@ -18,6 +18,7 @@ Map<String, dynamic> productJson({int catalog = 1, String? deletedAt}) => {
   'description': null,
   'baseUnitId': bottle,
   'trackStock': true,
+  'baseQuantityScale': 1,
   'active': true,
   'version': catalog,
   'catalogVersion': catalog,

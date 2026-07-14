@@ -124,6 +124,10 @@ void main() {
       (await migrated.select(migrated.products).getSingle()).name,
       'Existing',
     );
+    expect(
+      (await migrated.select(migrated.products).getSingle()).baseQuantityScale,
+      1,
+    );
     expect(await migrated.select(migrated.sales).get(), isEmpty);
     expect(
       raw.select(

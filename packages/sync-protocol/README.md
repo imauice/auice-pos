@@ -25,7 +25,7 @@ The local outbox uses `pending`, `processing`, `synced`, and `dead_letter`. A re
 ## Multi-unit payload examples
 
 ```json
-{"entityType":"product","payload":{"id":"uuid","name":"Beer A","baseUnitId":"bottle-unit-id","trackStock":true}}
+{"entityType":"product","payload":{"id":"uuid","name":"Beer A","baseUnitId":"bottle-unit-id","trackStock":true,"baseQuantityScale":1}}
 {"entityType":"product_unit","payload":{"id":"case-unit-id","productId":"uuid","code":"case","name":"ลัง","conversionNumerator":12,"conversionDenominator":1,"barcode":"case-barcode","allowSale":true,"allowPurchase":true}}
 {"entityType":"product_price","payload":{"productId":"uuid","productUnitId":"case-unit-id","priceMinor":72000,"currency":"THB"}}
 {"entityType":"sale","payload":{"items":[{"productUnitId":"case-unit-id","unitNameSnapshot":"ลัง","quantityMinor":2,"quantityScale":1,"conversionNumeratorSnapshot":12,"conversionDenominatorSnapshot":1,"baseQuantityMinor":24,"baseQuantityScale":1,"unitPriceMinor":72000}]}}

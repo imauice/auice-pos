@@ -1,5 +1,5 @@
 import 'package:auice_pos/features/sale/sale_repository.dart';
-import 'package:auice_pos/features/sale/sale_screen.dart';
+import 'package:auice_pos/features/sale/money_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';

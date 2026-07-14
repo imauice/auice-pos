@@ -1,5 +1,6 @@
 import 'package:auice_pos/core/database/app_database.dart';
 import 'package:auice_pos/core/domain/unit_conversion.dart';
+import 'package:auice_pos/features/sale/catalog_integrity_validator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,7 +24,7 @@ class CartItem {
       quantityScale: quantityScale,
       conversionNumerator: unit.conversionNumerator,
       conversionDenominator: unit.conversionDenominator,
-      baseQuantityScale: quantityScale,
+      baseQuantityScale: product.baseQuantityScale,
     );
   }
   final Product product;
@@ -40,7 +41,7 @@ class CartItem {
     quantityScale: quantityScale,
     conversionNumerator: unit.conversionNumerator,
     conversionDenominator: unit.conversionDenominator,
-    baseQuantityScale: quantityScale,
+    baseQuantityScale: product.baseQuantityScale,
   );
   CartItem withQuantity(int minor, {int? scale}) => CartItem(
     product: product,
@@ -67,11 +68,11 @@ class CartController extends StateNotifier<CartState> {
   CartController() : super(const CartState());
   CartState get current => state;
   void add(Product product, ProductUnit unit, ProductPrice price) {
-    if (!product.active) throw StateError('Product unavailable');
-    if (!unit.active || !unit.allowSale) {
-      throw StateError('Product unit unavailable');
-    }
-    if (!price.active) throw StateError('Price unavailable');
+    CatalogIntegrityValidator.validateOption(
+      product: product,
+      unit: unit,
+      price: price,
+    );
     final index = state.items.indexWhere((item) => item.unit.id == unit.id);
     if (index < 0) {
       state = CartState([

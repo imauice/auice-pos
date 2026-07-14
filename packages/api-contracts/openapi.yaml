@@ -14,6 +14,17 @@ paths:
       responses: { '201': { description: Deterministic per-event sync results } }
 components:
   schemas:
+    Product:
+      type: object
+      required: [id, branchId, name, trackStock, baseQuantityScale, active]
+      properties:
+        id: { type: string, format: uuid }
+        branchId: { type: string, format: uuid }
+        name: { type: string }
+        baseUnitId: { type: string, format: uuid, nullable: true }
+        trackStock: { type: boolean }
+        baseQuantityScale: { type: integer, minimum: 1, default: 1, description: Canonical scale used by every base-unit quantity for this product. }
+        active: { type: boolean }
     SyncEvent:
       type: object
       required: [id, entityType, entityId, operation, entityVersion, occurredAt, payload]

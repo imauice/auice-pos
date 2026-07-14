@@ -31,6 +31,8 @@ POS-003 adds `GET /api/branches`, `GET /api/branches/:id`, `POST /api/device/reg
 
 POS-004 adds an offline checkout under **Open Sale**. The sale screen searches the local catalog by name, SKU, or barcode; bottle and case units remain separate cart lines with captured prices. Checkout accepts cash, commits the sale, snapshot lines, payment, stock movements, and pending outbox events in one SQLite transaction, and makes the receipt and history available immediately. Until POS-005, opening the sale screen automatically creates a zero-opening-cash development shift when the configured device has no open shift. Receipt dates use UTC for deterministic offline sequencing; the branch timezone remains stored for a future localized display policy.
 
+Every Product has a positive canonical `baseQuantityScale` used by all of its SaleItem and StockMovement base quantities. Count products migrate to scale `1`; measured products can use scales such as `1000`. Checkout reloads and centrally validates the complete Product/ProductUnit/ProductPrice relationship, branch, THB currency, effective interval, active/deleted state, and captured price before persistence. UI money rendering uses integer division and remainder only.
+
 ## Development workflow
 
 Keep work task-focused, add migrations for database changes, validate inputs, use UTC internally, and add automated tests for business rules. Run lint, tests, builds, Flutter analysis, and Compose validation before delivery. Never commit real `.env` files or credentials.

@@ -3,6 +3,7 @@ import 'package:auice_pos/config/app_config.dart';
 import 'package:auice_pos/core/database/app_database.dart';
 import 'package:auice_pos/core/domain/unit_conversion.dart';
 import 'package:auice_pos/features/sale/cart.dart';
+import 'package:auice_pos/features/sale/catalog_integrity_validator.dart';
 import 'package:auice_pos/features/sale/sale_repository.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -51,8 +52,8 @@ class SaleCompletionService {
                 ))
                 .getSingleOrNull();
         if (shift == null) throw const SaleException('No open shift');
-        await _validateCatalog(cart);
         final at = now().toUtc();
+        await _validateCatalog(cart, branch.id, 'THB', at);
         final saleId = const Uuid().v7();
         final receiptNumber = await _nextReceipt(device.value, at);
         final sale = SalesCompanion.insert(
@@ -94,7 +95,7 @@ class SaleCompletionService {
             'conversionNumeratorSnapshot': item.unit.conversionNumerator,
             'conversionDenominatorSnapshot': item.unit.conversionDenominator,
             'baseQuantityMinor': item.baseQuantityMinor,
-            'baseQuantityScale': item.quantityScale,
+            'baseQuantityScale': item.product.baseQuantityScale,
             'unitPriceMinor': item.price.priceMinor,
             'subtotalMinor': item.subtotalMinor,
             'discountMinor': 0,
@@ -122,7 +123,7 @@ class SaleCompletionService {
                   conversionDenominatorSnapshot:
                       item.unit.conversionDenominator,
                   baseQuantityMinor: item.baseQuantityMinor,
-                  baseQuantityScale: item.quantityScale,
+                  baseQuantityScale: item.product.baseQuantityScale,
                   unitPriceMinor: item.price.priceMinor,
                   subtotalMinor: item.subtotalMinor,
                   discountMinor: 0,
@@ -155,7 +156,7 @@ class SaleCompletionService {
                       'sale',
                       item.baseQuantityMinor,
                     ),
-                    baseQuantityScale: item.quantityScale,
+                    baseQuantityScale: item.product.baseQuantityScale,
                     referenceType: 'sale',
                     referenceId: saleId,
                     occurredAt: at,
@@ -262,7 +263,12 @@ class SaleCompletionService {
     }
   }
 
-  Future<void> _validateCatalog(CartState cart) async {
+  Future<void> _validateCatalog(
+    CartState cart,
+    String branchId,
+    String currency,
+    DateTime soldAt,
+  ) async {
     for (final item in cart.items) {
       final product =
           await (db.select(db.products)..where(
@@ -291,8 +297,23 @@ class SaleCompletionService {
                     row.deletedAt.isNull(),
               ))
               .getSingleOrNull();
-      if (price == null || price.priceMinor != item.price.priceMinor) {
+      if (price == null) {
         throw const SaleException('Price unavailable');
+      }
+      try {
+        CatalogIntegrityValidator.validateCheckout(
+          product: product,
+          unit: unit,
+          price: price,
+          configuredBranchId: branchId,
+          saleCurrency: currency,
+          soldAt: soldAt,
+          snapshotPriceMinor: item.price.priceMinor,
+          snapshotBaseQuantityScale: item.product.baseQuantityScale,
+          snapshotTrackStock: item.product.trackStock,
+        );
+      } on CatalogIntegrityException catch (error) {
+        throw SaleException(error.message);
       }
     }
   }

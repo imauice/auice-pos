@@ -1,5 +1,7 @@
 import 'package:auice_pos/core/database/app_database.dart';
 import 'package:auice_pos/features/sale/cart.dart';
+import 'package:auice_pos/features/sale/catalog_integrity_validator.dart';
+import 'package:auice_pos/features/sale/money_formatter.dart';
 import 'package:auice_pos/features/sale/money_parser.dart';
 import 'package:auice_pos/features/sale/sale_completion_service.dart';
 import 'package:auice_pos/features/sale/sale_repository.dart';
@@ -48,6 +50,8 @@ Future<(Product, ProductUnit, ProductPrice)> option(
   required String unitName,
   required int price,
   required int conversion,
+  int conversionDenominator = 1,
+  int baseQuantityScale = 1,
   bool trackStock = true,
   String? barcode,
 }) async {
@@ -65,6 +69,7 @@ Future<(Product, ProductUnit, ProductPrice)> option(
             name: name,
             baseUnitId: Value(unitId),
             trackStock: trackStock,
+            baseQuantityScale: Value(baseQuantityScale),
             active: true,
             version: 1,
             catalogVersion: 1,
@@ -87,7 +92,7 @@ Future<(Product, ProductUnit, ProductPrice)> option(
           unitCategory: 'count',
           isBaseUnit: conversion == 1,
           conversionNumerator: conversion,
-          conversionDenominator: 1,
+          conversionDenominator: conversionDenominator,
           barcode: Value(barcode),
           allowSale: true,
           allowPurchase: true,
@@ -133,6 +138,84 @@ void main() {
     await configure(db);
   });
   tearDown(() => db.close());
+
+  final checkoutCorruptions = <String, Future<void> Function(AppDatabase)>{
+    'unit from another product': (db) =>
+        (db.update(db.productUnits)..where((row) => row.id.equals('bottle')))
+            .write(const ProductUnitsCompanion(productId: Value('other'))),
+    'unit from another branch': (db) =>
+        (db.update(db.productUnits)..where((row) => row.id.equals('bottle')))
+            .write(const ProductUnitsCompanion(branchId: Value('other'))),
+    'price from another unit': (db) =>
+        (db.update(db.productPrices)
+              ..where((row) => row.id.equals('price-bottle')))
+            .write(const ProductPricesCompanion(productUnitId: Value('other'))),
+    'price from another product': (db) =>
+        (db.update(db.productPrices)
+              ..where((row) => row.id.equals('price-bottle')))
+            .write(const ProductPricesCompanion(productId: Value('other'))),
+    'price from another branch': (db) =>
+        (db.update(db.productPrices)
+              ..where((row) => row.id.equals('price-bottle')))
+            .write(const ProductPricesCompanion(branchId: Value('other'))),
+    'future price': (db) =>
+        (db.update(
+          db.productPrices,
+        )..where((row) => row.id.equals('price-bottle'))).write(
+          ProductPricesCompanion(
+            effectiveFrom: Value(timestamp.add(const Duration(days: 1))),
+          ),
+        ),
+    'expired price': (db) =>
+        (db.update(db.productPrices)
+              ..where((row) => row.id.equals('price-bottle')))
+            .write(ProductPricesCompanion(effectiveTo: Value(timestamp))),
+    'currency mismatch': (db) =>
+        (db.update(db.productPrices)
+              ..where((row) => row.id.equals('price-bottle')))
+            .write(const ProductPricesCompanion(currency: Value('USD'))),
+    'product deactivated after cart admission': (db) =>
+        (db.update(db.products)..where((row) => row.id.equals('beer'))).write(
+          const ProductsCompanion(active: Value(false)),
+        ),
+    'price snapshot changed': (db) =>
+        (db.update(db.productPrices)
+              ..where((row) => row.id.equals('price-bottle')))
+            .write(const ProductPricesCompanion(priceMinor: Value(6600))),
+    'canonical stock scale changed': (db) =>
+        (db.update(db.products)..where((row) => row.id.equals('beer'))).write(
+          const ProductsCompanion(baseQuantityScale: Value(1000)),
+        ),
+  };
+
+  for (final scenario in checkoutCorruptions.entries) {
+    test('checkout rejects ${scenario.key} without partial records', () async {
+      final selected = await option(
+        db,
+        productId: 'beer',
+        unitId: 'bottle',
+        name: 'Beer',
+        unitName: 'Bottle',
+        price: 6500,
+        conversion: 1,
+      );
+      final cart = CartController()..add(selected.$1, selected.$2, selected.$3);
+      await scenario.value(db);
+      await expectLater(
+        SaleCompletionService(
+          db,
+          now: () => timestamp,
+        ).completeCashSale(cart.state, 6500),
+        throwsA(isA<SaleException>()),
+      );
+      expect(await db.select(db.sales).get(), isEmpty);
+      expect(await db.select(db.saleItems).get(), isEmpty);
+      expect(await db.select(db.payments).get(), isEmpty);
+      expect(await db.select(db.stockMovements).get(), isEmpty);
+      expect(await db.select(db.syncOutbox).get(), isEmpty);
+      expect(await db.select(db.receiptSequences).get(), isEmpty);
+    });
+  }
 
   test(
     'cart merges same unit, separates units, updates, removes, and uses line count',
@@ -203,6 +286,146 @@ void main() {
         ),
         throwsArgumentError,
       );
+    },
+  );
+
+  test('cart option validator rejects invalid catalog relations', () async {
+    final valid = await option(
+      db,
+      productId: 'beer',
+      unitId: 'bottle',
+      name: 'Beer',
+      unitName: 'Bottle',
+      price: 6500,
+      conversion: 1,
+    );
+    expect(
+      () => CartController().add(
+        valid.$1,
+        valid.$2.copyWith(productId: 'other'),
+        valid.$3,
+      ),
+      throwsA(isA<CatalogIntegrityException>()),
+    );
+    expect(
+      () => CartController().add(
+        valid.$1,
+        valid.$2,
+        valid.$3.copyWith(productUnitId: 'other'),
+      ),
+      throwsA(isA<CatalogIntegrityException>()),
+    );
+    expect(
+      () => CartController().add(
+        valid.$1,
+        valid.$2,
+        valid.$3.copyWith(productId: 'other'),
+      ),
+      throwsA(isA<CatalogIntegrityException>()),
+    );
+    expect(
+      () => CartController().add(
+        valid.$1,
+        valid.$2.copyWith(branchId: 'other'),
+        valid.$3,
+      ),
+      throwsA(isA<CatalogIntegrityException>()),
+    );
+    expect(
+      () => CartController().add(
+        valid.$1,
+        valid.$2,
+        valid.$3.copyWith(currency: 'USD'),
+      ),
+      throwsA(isA<CatalogIntegrityException>()),
+    );
+  });
+
+  test('canonical scale is stable across entered quantity scales', () async {
+    final beer = await option(
+      db,
+      productId: 'beer',
+      unitId: 'case',
+      name: 'Beer',
+      unitName: 'Case',
+      price: 72000,
+      conversion: 12,
+      baseQuantityScale: 1,
+    );
+    final caseLine = CartItem(
+      product: beer.$1,
+      unit: beer.$2,
+      price: beer.$3,
+      quantityMinor: 2,
+    );
+    expect(caseLine.baseQuantityMinor, 24);
+    expect(caseLine.product.baseQuantityScale, 1);
+    final fabric = await option(
+      db,
+      productId: 'fabric',
+      unitId: 'meter',
+      name: 'Fabric',
+      unitName: 'Meter',
+      price: 10000,
+      conversion: 1,
+      baseQuantityScale: 1000,
+    );
+    final decimalScale = CartItem(
+      product: fabric.$1,
+      unit: fabric.$2,
+      price: fabric.$3,
+      quantityMinor: 1250,
+      quantityScale: 1000,
+    );
+    final fractionScale = CartItem(
+      product: fabric.$1,
+      unit: fabric.$2,
+      price: fabric.$3,
+      quantityMinor: 5,
+      quantityScale: 4,
+    );
+    expect(decimalScale.baseQuantityMinor, 1250);
+    expect(fractionScale.baseQuantityMinor, 1250);
+    final receipt = await SaleCompletionService(
+      db,
+      now: () => timestamp,
+    ).completeCashSale(CartState([decimalScale]), decimalScale.totalMinor);
+    expect(receipt.items.single.baseQuantityScale, 1000);
+    expect(receipt.movements.single.baseQuantityScale, 1000);
+    expect(receipt.movements.single.baseQuantityMinor, -1250);
+  });
+
+  test('non-exact canonical conversion is rejected', () async {
+    final third = await option(
+      db,
+      productId: 'fabric',
+      unitId: 'third',
+      name: 'Fabric',
+      unitName: 'Third',
+      price: 300,
+      conversion: 1,
+      conversionDenominator: 3,
+      baseQuantityScale: 1000,
+    );
+    expect(
+      () => CartItem(
+        product: third.$1,
+        unit: third.$2,
+        price: third.$3,
+        quantityMinor: 1,
+      ),
+      throwsStateError,
+    );
+  });
+
+  test(
+    'integer-only money formatter supports signs, zero, and large values',
+    () {
+      expect(MoneyFormatter.formatMinor(0), '0.00');
+      expect(MoneyFormatter.formatMinor(1), '0.01');
+      expect(MoneyFormatter.formatMinor(12345), '123.45');
+      expect(MoneyFormatter.formatMinor(-501), '-5.01');
+      expect(MoneyFormatter.formatMinor(9007199254740991), '90071992547409.91');
     },
   );
 

@@ -139,6 +139,7 @@ class Product {
     this.description,
     this.baseUnitId,
     required this.trackStock,
+    required this.baseQuantityScale,
     required this.active,
     required this.createdAt,
     required this.updatedAt,
@@ -148,6 +149,7 @@ class Product {
   final String id, branchId, name;
   final String? categoryId, sku, description, baseUnitId;
   final bool trackStock, active;
+  final int baseQuantityScale;
   final DateTime createdAt, updatedAt;
   final int version;
   final DateTime? deletedAt;
@@ -160,6 +162,7 @@ class Product {
     'description': description,
     'baseUnitId': baseUnitId,
     'trackStock': trackStock,
+    'baseQuantityScale': baseQuantityScale,
     'active': active,
     'createdAt': iso(createdAt),
     'updatedAt': iso(updatedAt),

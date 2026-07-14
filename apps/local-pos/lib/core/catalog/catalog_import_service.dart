@@ -56,6 +56,7 @@ class CatalogImportService {
               description: Value(j['description'] as String?),
               baseUnitId: Value(j['baseUnitId'] as String?),
               trackStock: j['trackStock'] as bool,
+              baseQuantityScale: Value(j['baseQuantityScale'] as int? ?? 1),
               active: j['active'] as bool,
               version: j['version'] as int,
               catalogVersion: j['catalogVersion'] as int,

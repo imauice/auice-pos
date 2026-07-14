@@ -2,7 +2,7 @@
 
 Syncable entities use a public domain UUID, branch UUID, UTC creation/update timestamps, integer version, and nullable soft-delete timestamp. Transactional records also retain their originating device. Money is integer satang in THB. Quantities and rational conversions are integers only.
 
-Scaled conversion is centralized and exact: `baseQuantityMinor = quantityMinor × conversionNumerator × baseQuantityScale ÷ (quantityScale × conversionDenominator)`. Inputs must be positive integers, division must be exact, and TypeScript rejects unsafe intermediate integer overflow.
+Scaled conversion is centralized and exact: `baseQuantityMinor = quantityMinor × conversionNumerator × Product.baseQuantityScale ÷ (quantityScale × conversionDenominator)`. `Product.baseQuantityScale` is the positive canonical denominator for every base-unit quantity of that product and is never derived from cashier input. Inputs must be positive integers, division must be exact, and TypeScript rejects unsafe intermediate integer overflow.
 
 The model includes Branch, Device, Category, Product, ProductUnit, ProductPrice, Shift, Sale with embedded SaleItem and Payment snapshots, append-only StockMovement, and SyncEvent. Products never store a current stock quantity.
 
