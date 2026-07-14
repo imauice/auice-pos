@@ -47,6 +47,25 @@ class CatalogStartupCoordinator {
     try {
       _state(CatalogStartupState.registering);
       final registration = await gateway.register(await _deviceId());
+      final registeredAt = DateTime.now().toUtc();
+      await db
+          .into(db.appMetadata)
+          .insertOnConflictUpdate(
+            AppMetadataCompanion.insert(
+              key: 'registered_branch_id',
+              value: registration.branchId,
+              updatedAt: registeredAt,
+            ),
+          );
+      await db
+          .into(db.appMetadata)
+          .insertOnConflictUpdate(
+            AppMetadataCompanion.insert(
+              key: 'device_active',
+              value: 'true',
+              updatedAt: registeredAt,
+            ),
+          );
       await importer.importBranch(
         await gateway.fetchBranch(registration.branchId),
         registration.catalogVersion,

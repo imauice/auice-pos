@@ -3,6 +3,7 @@ import 'package:auice_pos/features/sale/money_parser.dart';
 import 'package:auice_pos/features/sale/money_formatter.dart';
 import 'package:auice_pos/features/sale/sale_completion_service.dart';
 import 'package:auice_pos/features/sale/sale_repository.dart';
+import 'package:auice_pos/features/sale/shift_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -42,6 +43,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           .read(checkoutControllerProvider)
           .completeCash(paid);
       ref.invalidate(recentSalesProvider);
+      ref.invalidate(shiftSummaryProvider(receipt.sale.shiftId));
       if (mounted) context.go('/receipt/${receipt.sale.id}');
     } on SaleException catch (e) {
       if (mounted) setState(() => error = e.message);

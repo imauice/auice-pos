@@ -3,6 +3,9 @@ import 'package:auice_pos/core/domain/unit_conversion.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Dart sync types include cash movements', () {
+    expect(syncEntityTypes, contains('cash_movement'));
+  });
   final at = DateTime.utc(2026, 7, 12, 10, 30);
   const id = '018f6f62-4b1d-7000-8000-000000000001';
   test('Money JSON uses integer minor units and THB', () {

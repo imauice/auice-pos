@@ -73,8 +73,8 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
                 child: const Text('Check Cloud Connection'),
               ),
               FilledButton.tonal(
-                onPressed: () => context.go('/sale'),
-                child: const Text('Open Sale'),
+                onPressed: () => context.go('/shift'),
+                child: const Text('Continue to Shift'),
               ),
             ],
           ),

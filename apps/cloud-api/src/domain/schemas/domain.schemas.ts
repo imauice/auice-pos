@@ -1,6 +1,8 @@
 import { Schema } from "mongoose";
 import {
   CURRENCY,
+  CASH_MOVEMENT_TYPES,
+  CASH_REASON_CODES,
   DEVICE_PLATFORMS,
   PAYMENT_METHODS,
   SALE_STATUSES,
@@ -191,6 +193,9 @@ export const ShiftSchema = new Schema(
     openedAt: { type: Date, required: true },
     closedAt: Date,
     openingCashMinor: money,
+    cashSalesMinor: money,
+    cashInMinor: money,
+    cashOutMinor: money,
     closingCashMinor: money,
     expectedCashMinor: money,
     cashDifferenceMinor: integer(),
@@ -198,6 +203,26 @@ export const ShiftSchema = new Schema(
   },
   options,
 );
+
+export const CashMovementSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, match: UUID_PATTERN },
+    branchId: { type: String, required: true, match: UUID_PATTERN },
+    deviceId: { type: String, required: true, match: UUID_PATTERN },
+    shiftId: { type: String, required: true, match: UUID_PATTERN },
+    type: { type: String, enum: CASH_MOVEMENT_TYPES, required: true },
+    amountMinor: money,
+    currency: { type: String, enum: CURRENCY, required: true },
+    reasonCode: { type: String, enum: CASH_REASON_CODES, required: true },
+    note: String,
+    occurredAt: { type: Date, required: true },
+    createdAt: { type: Date, required: true },
+    version: integer(1),
+  },
+  options,
+);
+CashMovementSchema.index({ branchId: 1, deviceId: 1 });
+CashMovementSchema.index({ shiftId: 1, occurredAt: 1 });
 
 export const SaleItemSchema = new Schema(
   {

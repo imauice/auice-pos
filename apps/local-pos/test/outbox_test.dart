@@ -91,7 +91,7 @@ void main() {
     expect(await migrated.select(migrated.products).get(), isEmpty);
     await migrated.close();
   });
-  test('v3 to v4 migration preserves catalog and outbox and creates sale schema', () async {
+  test('v3 to v6 migration preserves data and creates sale and shift schema', () async {
     await db.close();
     final raw = sqlite.sqlite3.openInMemory();
     raw.execute(
@@ -129,9 +129,29 @@ void main() {
       1,
     );
     expect(await migrated.select(migrated.sales).get(), isEmpty);
+    expect(await migrated.select(migrated.cashMovements).get(), isEmpty);
+    final shiftColumns = raw
+        .select('PRAGMA table_info(shifts)')
+        .map((row) => row['name'])
+        .toSet();
+    expect(
+      shiftColumns,
+      containsAll({
+        'cash_sales_minor',
+        'cash_in_minor',
+        'cash_out_minor',
+        'deleted_at',
+      }),
+    );
     expect(
       raw.select(
         "SELECT name FROM sqlite_master WHERE type='index' AND name='sales_sold_at_idx'",
+      ),
+      isNotEmpty,
+    );
+    expect(
+      raw.select(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='cash_movements_shift_occurred_idx'",
       ),
       isNotEmpty,
     );

@@ -1,6 +1,6 @@
 # Auice Sync Protocol v1
 
-`POST /api/sync/push` accepts 1–100 events. The envelope contains `protocolVersion`, branch/device UUIDs, and ordered events. Supported entity types are `branch`, `device`, `category`, `product`, `product_unit`, `product_price`, `shift`, `sale`, and `stock_movement`.
+`POST /api/sync/push` accepts 1–100 events. The envelope contains `protocolVersion`, branch/device UUIDs, and ordered events. Supported entity types are `branch`, `device`, `category`, `product`, `product_unit`, `product_price`, `shift`, `sale`, `stock_movement`, and `cash_movement`.
 
 Events use client-generated UUID v7 IDs, entity UUIDs, integer versions, UTC timestamps, and JSON payloads. The cloud event log intentionally uses a flexible JSON payload because one versioned log carries several domain shapes; envelope metadata remains strictly validated. Nest's default JSON body limit (100 KB) protects payload size, batches are limited to 100 events, and unknown properties are rejected.
 
@@ -35,3 +35,7 @@ The local outbox uses `pending`, `processing`, `synced`, and `dead_letter`. A re
 ## POS-004 local outbox production
 
 Offline completion writes one `sale` append event containing the immutable Sale, embedded SaleItems, and cash Payment, plus one `stock_movement` append event per stock-tracked line. These events are inserted atomically with their SQLite business records and remain `pending`; no network call or background push worker is part of POS-004.
+
+## POS-005 local shift events
+
+Opening writes a version 1 `shift` append event. Closing writes a version 2 `shift` update event containing the final cash snapshots. Each cash-in or cash-out writes a version 1 `cash_movement` append event with a positive integer amount; its type carries direction. Domain data and its event are committed together and remain pending offline. The Cloud endpoint validates and records the event envelope only—it does not apply shift or cash-movement payloads to Cloud domain collections in POS-005.

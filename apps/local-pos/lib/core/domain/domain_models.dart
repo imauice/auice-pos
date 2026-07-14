@@ -4,6 +4,19 @@ import 'package:flutter/foundation.dart';
 DateTime utc(String value) => DateTime.parse(value).toUtc();
 String iso(DateTime value) => value.toUtc().toIso8601String();
 
+const syncEntityTypes = {
+  'branch',
+  'device',
+  'category',
+  'product',
+  'product_unit',
+  'product_price',
+  'shift',
+  'sale',
+  'stock_movement',
+  'cash_movement',
+};
+
 @immutable
 class Money {
   const Money._(this.amountMinor, this.currency);
@@ -488,6 +501,9 @@ class Shift {
     required this.openedAt,
     this.closedAt,
     required this.openingCashMinor,
+    this.cashSalesMinor = 0,
+    this.cashInMinor = 0,
+    this.cashOutMinor = 0,
     this.closingCashMinor,
     this.expectedCashMinor,
     this.cashDifferenceMinor,
@@ -495,12 +511,55 @@ class Shift {
     required this.createdAt,
     required this.updatedAt,
     required this.version,
+    this.deletedAt,
   });
   final String id, branchId, deviceId, status, currency;
   final DateTime openedAt, createdAt, updatedAt;
-  final DateTime? closedAt;
-  final int openingCashMinor, version;
+  final DateTime? closedAt, deletedAt;
+  final int openingCashMinor,
+      cashSalesMinor,
+      cashInMinor,
+      cashOutMinor,
+      version;
   final int? closingCashMinor, expectedCashMinor, cashDifferenceMinor;
+}
+
+@immutable
+class CashMovement {
+  const CashMovement({
+    required this.id,
+    required this.branchId,
+    required this.deviceId,
+    required this.shiftId,
+    required this.type,
+    required this.amountMinor,
+    required this.currency,
+    required this.reasonCode,
+    this.note,
+    required this.occurredAt,
+    required this.createdAt,
+    required this.version,
+  });
+
+  final String id, branchId, deviceId, shiftId, type, currency, reasonCode;
+  final String? note;
+  final int amountMinor, version;
+  final DateTime occurredAt, createdAt;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'branchId': branchId,
+    'deviceId': deviceId,
+    'shiftId': shiftId,
+    'type': type,
+    'amountMinor': amountMinor,
+    'currency': currency,
+    'reasonCode': reasonCode,
+    'note': note,
+    'occurredAt': iso(occurredAt),
+    'createdAt': iso(createdAt),
+    'version': version,
+  };
 }
 
 @immutable

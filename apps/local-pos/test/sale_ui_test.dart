@@ -130,7 +130,13 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Open Sale'));
+      await tester.tap(find.text('Continue to Shift'));
+      await tester.pumpAndSettle();
+      expect(find.text('Open Shift'), findsOneWidget);
+      await tester.tap(find.text('Open shift'));
+      await tester.pumpAndSettle();
+      expect(find.text('Open Shift Dashboard'), findsOneWidget);
+      await tester.tap(find.text('Start Sale'));
       await tester.pumpAndSettle();
       expect(find.text('Sale'), findsOneWidget);
 
@@ -162,6 +168,60 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Sale History'), findsOneWidget);
       expect(find.textContaining('Sync pending'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'cash movements, difference preview, close, and history work offline',
+    (tester) async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      await seedUi(db);
+      addTearDown(db.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            catalogGatewayProvider.overrideWithValue(OfflineGateway()),
+          ],
+          child: const AuicePosApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue to Shift'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open shift'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cash In'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('cash-movement-type')), findsOneWidget);
+      await tester.enterText(find.byType(TextField).first, '5.00');
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cash in: 5.00 THB'), findsOneWidget);
+
+      await tester.tap(find.text('Cash Out'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '2.00');
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      expect(find.text('Expected cash: 3.00 THB'), findsOneWidget);
+
+      await tester.tap(find.text('Close Shift'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '3.00');
+      await tester.pump();
+      expect(find.text('Difference: 0.00 THB'), findsOneWidget);
+      await tester.tap(find.text('Close shift'));
+      await tester.pumpAndSettle();
+      expect(find.text('Shift Detail'), findsOneWidget);
+      expect(find.text('Status: closed'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Shift History'));
+      await tester.tap(find.text('Shift History'));
+      await tester.pumpAndSettle();
+      expect(find.text('Shift History'), findsOneWidget);
+      expect(find.textContaining('Gross 0.00'), findsOneWidget);
     },
   );
 }

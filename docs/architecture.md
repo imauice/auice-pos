@@ -80,3 +80,23 @@ Future Cloud Sync
 ```
 
 Cart prices and names are snapshots: later catalog imports cannot rewrite a completed receipt or silently change an existing cart line. `itemCount` is the number of distinct cart lines, not a sum of units or base quantity. Stock is represented only by signed append-only movements; a sale creates one negative-base movement for each stock-tracked line.
+
+POS-005 shift flow:
+
+```text
+Open Shift
+    ↓
+Offline Sales and Cash Movements
+    ↓
+Calculate Expected Cash
+    ↓
+Count Actual Cash
+    ↓
+Close Shift Atomically
+    ↓
+Future Cloud Sync
+```
+
+SQLite enforces one open shift per device with a partial unique index in addition to the service guard. Opening, cash movement, and closing each pair their domain write with an outbox event in one transaction. SQLite serializes writes on the connection; closing calculates its summary and conditionally changes `status = open` within the same transaction, so a competing sale or close cannot leave a partially reconciled shift.
+
+Open summaries are derived from completed local sales, cash payments, and append-only cash movements. A cash sale contributes tender minus change. Closing persists `cashSalesMinor`, `cashInMinor`, `cashOutMinor`, `expectedCashMinor`, closing cash, and difference; closed summaries use those cash snapshots. Completed sale records are immutable in the current workflow. Cancellation, refunds, Cloud event application, and background synchronization remain deferred.

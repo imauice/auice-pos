@@ -44,7 +44,18 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(openShiftProvider);
+    final shift = ref.watch(openShiftProvider);
+    if (shift.valueOrNull == null && !shift.isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Sale')),
+        body: Center(
+          child: FilledButton(
+            onPressed: () => context.go('/shift'),
+            child: const Text('Open a shift before selling'),
+          ),
+        ),
+      );
+    }
     final cart = ref.watch(cartProvider);
     final cloud = ref.watch(cloudConnectionProvider).status;
     return Scaffold(

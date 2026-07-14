@@ -79,7 +79,9 @@ class CatalogIntegrityValidator {
     }
     if (product.baseQuantityScale != snapshotBaseQuantityScale ||
         product.trackStock != snapshotTrackStock) {
-      throw const CatalogIntegrityException('Product stock configuration changed');
+      throw const CatalogIntegrityException(
+        'Product stock configuration changed',
+      );
     }
   }
 }

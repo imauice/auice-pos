@@ -55,7 +55,7 @@ Status: Approved
 
 # POS-004 — Offline Sale Transaction, Cart and Receipt Foundation
 
-Status: Submitted for Review
+Status: Approved
 
 - [x] Add Drift v4 shift, sale, line, payment, movement, and receipt-sequence tables
 - [x] Implement local cart, exact integer calculations, and multi-unit behavior
@@ -74,3 +74,14 @@ Status: Submitted for Review
 - [x] Replace floating-point UI money formatting with integer formatting
 - [x] Add weighted, relationship, effective-price, formatting, and rollback tests
 - [x] Complete final verification and submit for review
+
+# POS-005 — Shift, Cash Management and Daily Closing
+
+Status: Submitted for Review
+
+- [x] Add CashMovement and closing snapshot schemas with v6 migration and indexes
+- [x] Implement explicit open-shift, cash-movement, summary, and close services
+- [x] Enforce open shifts for sales and atomic domain/outbox writes
+- [x] Add Riverpod shift flow, dashboard, cash, closing, history, and detail screens
+- [x] Add shift lifecycle, reconciliation, rollback, concurrency, migration, and UI tests
+- [x] Complete and record final verification

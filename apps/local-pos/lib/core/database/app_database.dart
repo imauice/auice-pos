@@ -131,12 +131,33 @@ class Shifts extends Table {
   DateTimeColumn get openedAt => dateTime()();
   DateTimeColumn get closedAt => dateTime().nullable()();
   IntColumn get openingCashMinor => integer()();
+  IntColumn get cashSalesMinor => integer().withDefault(const Constant(0))();
+  IntColumn get cashInMinor => integer().withDefault(const Constant(0))();
+  IntColumn get cashOutMinor => integer().withDefault(const Constant(0))();
   IntColumn get closingCashMinor => integer().nullable()();
   IntColumn get expectedCashMinor => integer().nullable()();
   IntColumn get cashDifferenceMinor => integer().nullable()();
   TextColumn get currency => text()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
+  IntColumn get version => integer()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class CashMovements extends Table {
+  TextColumn get id => text()();
+  TextColumn get branchId => text()();
+  TextColumn get deviceId => text()();
+  TextColumn get shiftId => text()();
+  TextColumn get type => text()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get currency => text()();
+  TextColumn get reasonCode => text()();
+  TextColumn get note => text().nullable()();
+  DateTimeColumn get occurredAt => dateTime()();
+  DateTimeColumn get createdAt => dateTime()();
   IntColumn get version => integer()();
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -252,6 +273,7 @@ class ReceiptSequences extends Table {
     ProductUnits,
     ProductPrices,
     Shifts,
+    CashMovements,
     Sales,
     SaleItems,
     Payments,
@@ -263,7 +285,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -273,6 +295,7 @@ class AppDatabase extends _$AppDatabase {
       );
       await _createCatalogIndexes();
       await _createSaleIndexes();
+      await _createShiftIndexes();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
@@ -300,6 +323,16 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from >= 3 && from < 5) {
         await m.addColumn(products, products.baseQuantityScale);
+      }
+      if (from >= 4 && from < 6) {
+        await m.addColumn(shifts, shifts.cashSalesMinor);
+        await m.addColumn(shifts, shifts.cashInMinor);
+        await m.addColumn(shifts, shifts.cashOutMinor);
+        await m.addColumn(shifts, shifts.deletedAt);
+      }
+      if (from < 6) {
+        await m.createTable(cashMovements);
+        await _createShiftIndexes();
       }
     },
   );
@@ -336,6 +369,24 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX stock_movements_reference_idx ON stock_movements(reference_type, reference_id)',
+    );
+  }
+
+  Future<void> _createShiftIndexes() async {
+    await customStatement(
+      'CREATE INDEX shifts_branch_opened_idx ON shifts(branch_id, opened_at DESC)',
+    );
+    await customStatement(
+      'CREATE INDEX sales_shift_status_idx ON sales(shift_id, status)',
+    );
+    await customStatement(
+      'CREATE INDEX payments_sale_method_idx ON payments(sale_id, method)',
+    );
+    await customStatement(
+      'CREATE INDEX cash_movements_shift_occurred_idx ON cash_movements(shift_id, occurred_at)',
+    );
+    await customStatement(
+      'CREATE INDEX cash_movements_branch_device_idx ON cash_movements(branch_id, device_id)',
     );
   }
 
