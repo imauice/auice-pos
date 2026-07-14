@@ -122,6 +122,125 @@ class ProductPrices extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+class Shifts extends Table {
+  TextColumn get id => text()();
+  TextColumn get branchId => text()();
+  TextColumn get deviceId => text()();
+  TextColumn get status => text()();
+  DateTimeColumn get openedAt => dateTime()();
+  DateTimeColumn get closedAt => dateTime().nullable()();
+  IntColumn get openingCashMinor => integer()();
+  IntColumn get closingCashMinor => integer().nullable()();
+  IntColumn get expectedCashMinor => integer().nullable()();
+  IntColumn get cashDifferenceMinor => integer().nullable()();
+  TextColumn get currency => text()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  IntColumn get version => integer()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class Sales extends Table {
+  TextColumn get id => text()();
+  TextColumn get branchId => text()();
+  TextColumn get deviceId => text()();
+  TextColumn get shiftId => text()();
+  TextColumn get receiptNumber => text().unique()();
+  TextColumn get status => text()();
+  TextColumn get currency => text()();
+  IntColumn get subtotalMinor => integer()();
+  IntColumn get discountMinor => integer()();
+  IntColumn get taxMinor => integer()();
+  IntColumn get totalMinor => integer()();
+  IntColumn get paidMinor => integer()();
+  IntColumn get changeMinor => integer()();
+  IntColumn get itemCount => integer()();
+  DateTimeColumn get soldAt => dateTime()();
+  DateTimeColumn get voidedAt => dateTime().nullable()();
+  TextColumn get voidReason => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  IntColumn get version => integer()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class SaleItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get saleId => text()();
+  TextColumn get productId => text()();
+  TextColumn get productUnitId => text()();
+  TextColumn get productNameSnapshot => text()();
+  TextColumn get skuSnapshot => text().nullable()();
+  TextColumn get unitCodeSnapshot => text()();
+  TextColumn get unitNameSnapshot => text()();
+  TextColumn get barcodeSnapshot => text().nullable()();
+  IntColumn get quantityMinor => integer()();
+  IntColumn get quantityScale => integer()();
+  IntColumn get conversionNumeratorSnapshot => integer()();
+  IntColumn get conversionDenominatorSnapshot => integer()();
+  IntColumn get baseQuantityMinor => integer()();
+  IntColumn get baseQuantityScale => integer()();
+  IntColumn get unitPriceMinor => integer()();
+  IntColumn get subtotalMinor => integer()();
+  IntColumn get discountMinor => integer()();
+  IntColumn get taxMinor => integer()();
+  IntColumn get totalMinor => integer()();
+  DateTimeColumn get createdAt => dateTime()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class Payments extends Table {
+  TextColumn get id => text()();
+  TextColumn get saleId => text()();
+  TextColumn get branchId => text()();
+  TextColumn get deviceId => text()();
+  TextColumn get method => text()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get currency => text()();
+  TextColumn get reference => text().nullable()();
+  DateTimeColumn get paidAt => dateTime()();
+  DateTimeColumn get createdAt => dateTime()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class StockMovements extends Table {
+  TextColumn get id => text()();
+  TextColumn get branchId => text()();
+  TextColumn get deviceId => text()();
+  TextColumn get productId => text()();
+  TextColumn get type => text()();
+  TextColumn get sourceUnitId => text()();
+  TextColumn get sourceUnitCodeSnapshot => text()();
+  TextColumn get sourceUnitNameSnapshot => text()();
+  IntColumn get sourceQuantityMinor => integer()();
+  IntColumn get sourceQuantityScale => integer()();
+  IntColumn get conversionNumeratorSnapshot => integer()();
+  IntColumn get conversionDenominatorSnapshot => integer()();
+  IntColumn get baseQuantityMinor => integer()();
+  IntColumn get baseQuantityScale => integer()();
+  TextColumn get referenceType => text()();
+  TextColumn get referenceId => text()();
+  DateTimeColumn get occurredAt => dateTime()();
+  TextColumn get note => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  IntColumn get version => integer()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class ReceiptSequences extends Table {
+  TextColumn get deviceId => text()();
+  TextColumn get localDate => text()();
+  IntColumn get nextValue => integer()();
+  @override
+  Set<Column<Object>> get primaryKey => {deviceId, localDate};
+}
+
 @DriftDatabase(
   tables: [
     AppMetadata,
@@ -131,13 +250,19 @@ class ProductPrices extends Table {
     Products,
     ProductUnits,
     ProductPrices,
+    Shifts,
+    Sales,
+    SaleItems,
+    Payments,
+    StockMovements,
+    ReceiptSequences,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -146,6 +271,7 @@ class AppDatabase extends _$AppDatabase {
         'CREATE INDEX sync_outbox_pending_created_idx ON sync_outbox(status, created_at)',
       );
       await _createCatalogIndexes();
+      await _createSaleIndexes();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
@@ -161,6 +287,15 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(productUnits);
         await m.createTable(productPrices);
         await _createCatalogIndexes();
+      }
+      if (from < 4) {
+        await m.createTable(shifts);
+        await m.createTable(sales);
+        await m.createTable(saleItems);
+        await m.createTable(payments);
+        await m.createTable(stockMovements);
+        await m.createTable(receiptSequences);
+        await _createSaleIndexes();
       }
     },
   );
@@ -179,6 +314,24 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX product_prices_unit_effective_idx ON product_prices(product_unit_id, effective_from)',
+    );
+  }
+
+  Future<void> _createSaleIndexes() async {
+    await customStatement(
+      "CREATE UNIQUE INDEX shifts_one_open_device_idx ON shifts(device_id) WHERE status = 'open'",
+    );
+    await customStatement(
+      'CREATE INDEX sales_sold_at_idx ON sales(sold_at DESC)',
+    );
+    await customStatement(
+      'CREATE INDEX sale_items_sale_idx ON sale_items(sale_id)',
+    );
+    await customStatement(
+      'CREATE INDEX payments_sale_idx ON payments(sale_id)',
+    );
+    await customStatement(
+      'CREATE INDEX stock_movements_reference_idx ON stock_movements(reference_type, reference_id)',
     );
   }
 

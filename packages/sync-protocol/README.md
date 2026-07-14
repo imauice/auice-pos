@@ -31,3 +31,7 @@ The local outbox uses `pending`, `processing`, `synced`, and `dead_letter`. A re
 {"entityType":"sale","payload":{"items":[{"productUnitId":"case-unit-id","unitNameSnapshot":"ลัง","quantityMinor":2,"quantityScale":1,"conversionNumeratorSnapshot":12,"conversionDenominatorSnapshot":1,"baseQuantityMinor":24,"baseQuantityScale":1,"unitPriceMinor":72000}]}}
 {"entityType":"stock_movement","payload":{"type":"sale","sourceUnitId":"case-unit-id","sourceQuantityMinor":2,"sourceQuantityScale":1,"conversionNumeratorSnapshot":12,"conversionDenominatorSnapshot":1,"baseQuantityMinor":-24,"baseQuantityScale":1}}
 ```
+
+## POS-004 local outbox production
+
+Offline completion writes one `sale` append event containing the immutable Sale, embedded SaleItems, and cash Payment, plus one `stock_movement` append event per stock-tracked line. These events are inserted atomically with their SQLite business records and remain `pending`; no network call or background push worker is part of POS-004.

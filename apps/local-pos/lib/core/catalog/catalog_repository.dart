@@ -9,6 +9,8 @@ class BarcodeCatalogResult {
   final ProductPrice? price;
 }
 
+typedef CatalogSaleOption = BarcodeCatalogResult;
+
 class CatalogRepository {
   CatalogRepository(this.db);
   final AppDatabase db;
@@ -54,6 +56,26 @@ class CatalogRepository {
                 r.deletedAt.isNull(),
           ))
           .get();
+  Future<List<CatalogSaleOption>> searchSaleOptions(
+    String branchId,
+    String query,
+  ) async {
+    final byBarcode = await findByBarcode(branchId, query);
+    if (byBarcode != null && byBarcode.price != null) return [byBarcode];
+    final sku = await findBySku(branchId, query);
+    final products = sku == null ? await findByName(branchId, query) : [sku];
+    final results = <CatalogSaleOption>[];
+    for (final product in products) {
+      for (final unit in await findProductUnits(product.id)) {
+        final price = await findCurrentProductPrice(unit.id);
+        if (unit.allowSale && price != null) {
+          results.add(CatalogSaleOption(product, unit, price));
+        }
+      }
+    }
+    return results;
+  }
+
   Future<List<ProductUnit>> findProductUnits(String productId) =>
       (db.select(db.productUnits)..where(
             (r) =>

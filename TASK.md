@@ -52,3 +52,16 @@ Status: Approved
 - [x] Persist only the pending catalog cursor for interrupted pulls
 - [x] Wire catalog startup and dependencies through Riverpod
 - [x] Verify Cloud API, Cloud Web, and Flutter commands
+
+# POS-004 — Offline Sale Transaction, Cart and Receipt Foundation
+
+Status: Approved
+
+- [x] Add Drift v4 shift, sale, line, payment, movement, and receipt-sequence tables
+- [x] Implement local cart, exact integer calculations, and multi-unit behavior
+- [x] Implement cash payment, change, and atomic sale/outbox completion
+- [x] Add automatic development shift and per-device receipt sequences
+- [x] Add local receipt repository, history, and snapshot reconstruction
+- [x] Add sale, payment, receipt, history, and receipt-detail screens
+- [x] Add scenario, rollback, migration, repository, and offline UI tests
+- [x] Complete and record final verification

@@ -3,6 +3,7 @@ import 'package:auice_pos/features/startup/catalog_startup_coordinator.dart';
 import 'package:auice_pos/features/startup/cloud_connection_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class StartupScreen extends ConsumerStatefulWidget {
   const StartupScreen({super.key});
@@ -70,6 +71,10 @@ class _StartupScreenState extends ConsumerState<StartupScreen> {
                     ? null
                     : () => ref.read(cloudConnectionProvider.notifier).check(),
                 child: const Text('Check Cloud Connection'),
+              ),
+              FilledButton.tonal(
+                onPressed: () => context.go('/sale'),
+                child: const Text('Open Sale'),
               ),
             ],
           ),

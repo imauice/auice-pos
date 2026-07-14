@@ -91,4 +91,46 @@ void main() {
     expect(await migrated.select(migrated.products).get(), isEmpty);
     await migrated.close();
   });
+  test('v3 to v4 migration preserves catalog and outbox and creates sale schema', () async {
+    await db.close();
+    final raw = sqlite.sqlite3.openInMemory();
+    raw.execute(
+      'CREATE TABLE app_metadata (`key` TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+    );
+    raw.execute(
+      'CREATE TABLE sync_outbox (id TEXT NOT NULL PRIMARY KEY, branch_id TEXT NOT NULL, device_id TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, operation TEXT NOT NULL, entity_version INTEGER NOT NULL, payload_json TEXT NOT NULL, occurred_at INTEGER NOT NULL, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT \'pending\', retry_count INTEGER NOT NULL DEFAULT 0, last_attempt_at INTEGER NULL, last_error TEXT NULL, synced_at INTEGER NULL)',
+    );
+    raw.execute(
+      'CREATE TABLE products (id TEXT NOT NULL PRIMARY KEY, branch_id TEXT NOT NULL, category_id TEXT NULL, sku TEXT NULL, name TEXT NOT NULL, description TEXT NULL, base_unit_id TEXT NULL, track_stock INTEGER NOT NULL, active INTEGER NOT NULL, version INTEGER NOT NULL, catalog_version INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER NULL)',
+    );
+    raw.execute("INSERT INTO app_metadata VALUES ('proof','ready',0)");
+    raw.execute(
+      "INSERT INTO sync_outbox (id,branch_id,device_id,entity_type,entity_id,operation,entity_version,payload_json,occurred_at,created_at) VALUES ('pending','b','d','product','p','create',1,'{}',0,0)",
+    );
+    raw.execute(
+      "INSERT INTO products (id,branch_id,sku,name,track_stock,active,version,catalog_version,updated_at) VALUES ('p','b','SKU','Existing',0,1,1,1,0)",
+    );
+    raw.execute('PRAGMA user_version = 3');
+    final migrated = AppDatabase.forTesting(NativeDatabase.opened(raw));
+    expect(
+      (await migrated.select(migrated.appMetadata).getSingle()).value,
+      'ready',
+    );
+    expect(
+      (await migrated.select(migrated.syncOutbox).getSingle()).id,
+      'pending',
+    );
+    expect(
+      (await migrated.select(migrated.products).getSingle()).name,
+      'Existing',
+    );
+    expect(await migrated.select(migrated.sales).get(), isEmpty);
+    expect(
+      raw.select(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='sales_sold_at_idx'",
+      ),
+      isNotEmpty,
+    );
+    await migrated.close();
+  });
 }

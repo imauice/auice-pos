@@ -29,6 +29,8 @@ The API health endpoint is `GET http://localhost:3000/api/health`; Swagger is at
 
 POS-003 adds `GET /api/branches`, `GET /api/branches/:id`, `POST /api/device/register`, snapshot-paginated `GET /api/catalog`, and branch-scoped paginated read-only views under `GET /api/catalog-view/:kind` and `GET /api/device`. Flutter configuration also supports `BRANCH_CODE`, `DEVICE_NAME`, `DEVICE_PLATFORM`, and `APP_VERSION` through `--dart-define`. Startup makes the local catalog usable first, then registers and resumes catalog synchronization when online. A first run without a catalog and network reports setup-required instead of sale readiness.
 
+POS-004 adds an offline checkout under **Open Sale**. The sale screen searches the local catalog by name, SKU, or barcode; bottle and case units remain separate cart lines with captured prices. Checkout accepts cash, commits the sale, snapshot lines, payment, stock movements, and pending outbox events in one SQLite transaction, and makes the receipt and history available immediately. Until POS-005, opening the sale screen automatically creates a zero-opening-cash development shift when the configured device has no open shift. Receipt dates use UTC for deterministic offline sequencing; the branch timezone remains stored for a future localized display policy.
+
 ## Development workflow
 
 Keep work task-focused, add migrations for database changes, validate inputs, use UTC internally, and add automated tests for business rules. Run lint, tests, builds, Flutter analysis, and Compose validation before delivery. Never commit real `.env` files or credentials.

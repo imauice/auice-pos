@@ -57,3 +57,26 @@ Ready for Sale (sale workflow remains future work)
 The first pull freezes `targetVersion`; keyset cursors carry the from/target versions and last `(catalogVersion, entityType, id)`. Later cloud mutations wait for the next pull. A master-data mutation normally increments the branch and writes the record in one MongoDB session transaction. Standalone MongoDB cannot transact: the documented fallback increments then writes, and any gap is recovered by reissuing the mutation with a new catalog version; production should use a replica set.
 
 Branch endpoints intentionally omit `currentCatalogVersion`; registration and catalog responses expose the synchronization versions. Device metadata changes increment Device.version, while heartbeat-only repeat registration does not. Devices cannot move branches through registration.
+
+POS-004 offline sale flow:
+
+```text
+Search Local Catalog
+      ↓
+Build Cart
+      ↓
+Validate Cash Payment
+      ↓
+Single SQLite Transaction
+      ├── Sale
+      ├── SaleItems
+      ├── Payment
+      ├── StockMovements
+      └── SyncOutbox
+      ↓
+Receipt Available Immediately
+      ↓
+Future Cloud Sync
+```
+
+Cart prices and names are snapshots: later catalog imports cannot rewrite a completed receipt or silently change an existing cart line. `itemCount` is the number of distinct cart lines, not a sum of units or base quantity. Stock is represented only by signed append-only movements; a sale creates one negative-base movement for each stock-tracked line.
