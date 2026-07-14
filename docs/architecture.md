@@ -39,3 +39,21 @@ SQLite Transaction
 ```
 
 Products have exactly one inventory base unit. Configurable ProductUnits convert directly to it using positive integer rationals. Unit prices are independent, and sale/movement history snapshots unit and conversion data.
+
+POS-003 master-data flow:
+
+```text
+Cloud Master Data
+   ↓
+Snapshot Catalog API
+   ↓
+Transactional SQLite Import
+   ↓
+Local Search and Barcode Lookup
+   ↓
+Ready for Sale (sale workflow remains future work)
+```
+
+The first pull freezes `targetVersion`; keyset cursors carry the from/target versions and last `(catalogVersion, entityType, id)`. Later cloud mutations wait for the next pull. A master-data mutation normally increments the branch and writes the record in one MongoDB session transaction. Standalone MongoDB cannot transact: the documented fallback increments then writes, and any gap is recovered by reissuing the mutation with a new catalog version; production should use a replica set.
+
+Branch endpoints intentionally omit `currentCatalogVersion`; registration and catalog responses expose the synchronization versions. Device metadata changes increment Device.version, while heartbeat-only repeat registration does not. Devices cannot move branches through registration.

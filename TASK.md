@@ -4,7 +4,7 @@ Status: Approved
 
 # POS-002 — Core Domain Model and Sync Contract
 
-Status: In Progress
+Status: Approved
 
 - [x] Define UUID, UTC timestamp, integer money, quantity, and version rules
 - [x] Define all core entities and mandatory ProductUnit addendum
@@ -27,3 +27,19 @@ Status: In Progress
 - [x] Allow empty delete payload objects
 - [x] Support mixed per-event acceptance and rejection
 - [x] Run and record final API and Flutter verification
+
+# POS-003 — Branch, Device Registration, Product Catalog and Initial Pull Sync
+
+Status: In Progress
+
+- [x] Add explicit Branch list/get APIs
+- [x] Add conflict-safe idempotent device registration
+- [x] Add transactional catalog mutation/version boundary
+- [x] Add stable snapshot keyset catalog pull
+- [x] Add Drift schema-v3 master-data tables and indexes
+- [x] Add resumable transactional catalog page import
+- [x] Add SKU, name, unit, barcode, and current-price lookup
+- [x] Add non-blocking online/offline startup coordinator
+- [x] Add Cloud Web read-only master-data routes
+- [x] Add cloud and Flutter coverage for POS-003 behavior
+- [x] Complete and record final verification

@@ -65,4 +65,30 @@ void main() {
     expect((await migrated.listPendingEvents()).single.id, 'new');
     await migrated.close();
   });
+  test('v2 to v3 migration preserves app_metadata and sync_outbox', () async {
+    await db.close();
+    final raw = sqlite.sqlite3.openInMemory();
+    raw.execute(
+      'CREATE TABLE app_metadata (`key` TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL)',
+    );
+    raw.execute(
+      'CREATE TABLE sync_outbox (id TEXT NOT NULL PRIMARY KEY, branch_id TEXT NOT NULL, device_id TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, operation TEXT NOT NULL, entity_version INTEGER NOT NULL, payload_json TEXT NOT NULL, occurred_at INTEGER NOT NULL, created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT \'pending\', retry_count INTEGER NOT NULL DEFAULT 0, last_attempt_at INTEGER NULL, last_error TEXT NULL, synced_at INTEGER NULL)',
+    );
+    raw.execute("INSERT INTO app_metadata VALUES ('proof','ready',0)");
+    raw.execute(
+      "INSERT INTO sync_outbox (id,branch_id,device_id,entity_type,entity_id,operation,entity_version,payload_json,occurred_at,created_at) VALUES ('event','b','d','product','p','create',1,'{}',0,0)",
+    );
+    raw.execute('PRAGMA user_version = 2');
+    final migrated = AppDatabase.forTesting(NativeDatabase.opened(raw));
+    expect(
+      (await migrated.select(migrated.appMetadata).getSingle()).value,
+      'ready',
+    );
+    expect(
+      (await migrated.select(migrated.syncOutbox).getSingle()).id,
+      'event',
+    );
+    expect(await migrated.select(migrated.products).get(), isEmpty);
+    await migrated.close();
+  });
 }

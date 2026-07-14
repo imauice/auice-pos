@@ -34,12 +34,110 @@ class SyncOutbox extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [AppMetadata, SyncOutbox])
+class Branches extends Table {
+  TextColumn get id => text()();
+  TextColumn get code => text()();
+  TextColumn get name => text()();
+  TextColumn get timezone => text()();
+  TextColumn get currency => text()();
+  BoolColumn get active => boolean()();
+  IntColumn get version => integer()();
+  IntColumn get catalogVersion => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class Categories extends Table {
+  TextColumn get id => text()();
+  TextColumn get branchId => text()();
+  TextColumn get name => text()();
+  TextColumn get description => text().nullable()();
+  IntColumn get sortOrder => integer()();
+  BoolColumn get active => boolean()();
+  IntColumn get version => integer()();
+  IntColumn get catalogVersion => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class Products extends Table {
+  TextColumn get id => text()();
+  TextColumn get branchId => text()();
+  TextColumn get categoryId => text().nullable()();
+  TextColumn get sku => text().nullable()();
+  TextColumn get name => text()();
+  TextColumn get description => text().nullable()();
+  TextColumn get baseUnitId => text().nullable()();
+  BoolColumn get trackStock => boolean()();
+  BoolColumn get active => boolean()();
+  IntColumn get version => integer()();
+  IntColumn get catalogVersion => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class ProductUnits extends Table {
+  TextColumn get id => text()();
+  TextColumn get branchId => text()();
+  TextColumn get productId => text()();
+  TextColumn get code => text()();
+  TextColumn get name => text()();
+  TextColumn get unitCategory => text()();
+  BoolColumn get isBaseUnit => boolean()();
+  IntColumn get conversionNumerator => integer()();
+  IntColumn get conversionDenominator => integer()();
+  TextColumn get barcode => text().nullable()();
+  BoolColumn get allowSale => boolean()();
+  BoolColumn get allowPurchase => boolean()();
+  BoolColumn get active => boolean()();
+  IntColumn get version => integer()();
+  IntColumn get catalogVersion => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class ProductPrices extends Table {
+  TextColumn get id => text()();
+  TextColumn get branchId => text()();
+  TextColumn get productId => text()();
+  TextColumn get productUnitId => text()();
+  IntColumn get priceMinor => integer()();
+  TextColumn get currency => text()();
+  DateTimeColumn get effectiveFrom => dateTime()();
+  DateTimeColumn get effectiveTo => dateTime().nullable()();
+  BoolColumn get active => boolean()();
+  IntColumn get version => integer()();
+  IntColumn get catalogVersion => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DriftDatabase(
+  tables: [
+    AppMetadata,
+    SyncOutbox,
+    Branches,
+    Categories,
+    Products,
+    ProductUnits,
+    ProductPrices,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.executor);
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -47,6 +145,7 @@ class AppDatabase extends _$AppDatabase {
       await customStatement(
         'CREATE INDEX sync_outbox_pending_created_idx ON sync_outbox(status, created_at)',
       );
+      await _createCatalogIndexes();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
@@ -55,8 +154,34 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX sync_outbox_pending_created_idx ON sync_outbox(status, created_at)',
         );
       }
+      if (from < 3) {
+        await m.createTable(branches);
+        await m.createTable(categories);
+        await m.createTable(products);
+        await m.createTable(productUnits);
+        await m.createTable(productPrices);
+        await _createCatalogIndexes();
+      }
     },
   );
+  Future<void> _createCatalogIndexes() async {
+    await customStatement(
+      'CREATE INDEX products_branch_sku_idx ON products(branch_id, sku)',
+    );
+    await customStatement(
+      'CREATE INDEX products_branch_name_idx ON products(branch_id, name)',
+    );
+    await customStatement(
+      'CREATE INDEX product_units_branch_barcode_idx ON product_units(branch_id, barcode)',
+    );
+    await customStatement(
+      'CREATE INDEX product_units_product_idx ON product_units(product_id)',
+    );
+    await customStatement(
+      'CREATE INDEX product_prices_unit_effective_idx ON product_prices(product_unit_id, effective_from)',
+    );
+  }
+
   Future<void> initialize() async {
     await into(appMetadata).insertOnConflictUpdate(
       AppMetadataCompanion.insert(

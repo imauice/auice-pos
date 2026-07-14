@@ -1,17 +1,51 @@
+import 'dart:async';
+import 'package:auice_pos/features/startup/catalog_startup_coordinator.dart';
 import 'package:auice_pos/features/startup/cloud_connection_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class StartupScreen extends ConsumerWidget {
+class StartupScreen extends ConsumerStatefulWidget {
   const StartupScreen({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StartupScreen> createState() => _StartupScreenState();
+}
+
+class _StartupScreenState extends ConsumerState<StartupScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      final coordinator = ref.read(catalogStartupCoordinatorProvider);
+      if (coordinator == null) return;
+      coordinator.onState = (state) {
+        if (mounted) {
+          ref.read(catalogStartupStateProvider.notifier).state = state;
+        }
+      };
+      unawaited(coordinator.start());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cloud = ref.watch(cloudConnectionProvider);
+    final catalog = ref.watch(catalogStartupStateProvider);
     final label = switch (cloud.status) {
       CloudConnectionStatus.notChecked => 'Not checked',
       CloudConnectionStatus.loading => 'Loading',
       CloudConnectionStatus.online => 'Online',
       CloudConnectionStatus.offline => 'Offline',
+    };
+    final catalogLabel = switch (catalog) {
+      CatalogStartupState.firstRunNeedsConnection =>
+        'Setup required: connect to register and download catalog',
+      CatalogStartupState.readyOffline => 'Ready offline',
+      CatalogStartupState.readyOnline => 'Ready online',
+      CatalogStartupState.syncFailedUsingLocal =>
+        'Sync failed; using local catalog',
+      CatalogStartupState.loadingLocal => 'Loading local catalog',
+      CatalogStartupState.registering => 'Registering device',
+      CatalogStartupState.syncingCatalog => 'Updating catalog',
     };
     return Scaffold(
       appBar: AppBar(title: const Text('Auice POS')),
@@ -31,6 +65,7 @@ class StartupScreen extends ConsumerWidget {
               const SizedBox(height: 24),
               const Text('Local Database: Ready'),
               Text('Cloud Connection: $label'),
+              Text('Catalog: $catalogLabel'),
               const Text('Sync Status: Idle'),
               if (cloud.lastChecked != null)
                 Text('Last checked: ${cloud.lastChecked!.toLocal()}'),

@@ -1,2 +1,12 @@
-import { Controller, Get, Query } from '@nestjs/common'; import { ApiTags } from '@nestjs/swagger'; import { CatalogService } from './catalog.service'; import { CatalogQueryDto } from './dto/catalog-query.dto';
-@ApiTags('catalog') @Controller('catalog') export class CatalogController {constructor(private readonly catalog:CatalogService){} @Get() pull(@Query() query:CatalogQueryDto){return this.catalog.pull(query);}}
+import { Controller, Get, Query } from "@nestjs/common";
+import { ApiTags } from "@nestjs/swagger";
+import { CatalogService } from "./catalog.service";
+import { CatalogQueryDto } from "./dto/catalog-query.dto";
+@ApiTags("catalog")
+@Controller("catalog")
+export class CatalogController {
+  constructor(private readonly catalog: CatalogService) {}
+  @Get() pull(@Query() query: CatalogQueryDto) {
+    return this.catalog.pull(query);
+  }
+}
